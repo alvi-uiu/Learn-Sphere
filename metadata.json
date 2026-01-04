@@ -1,0 +1,8 @@
+{
+  "name": "LearnSphere",
+  "description": "An AI-Enhanced Academic Partner combining personalized learning, social collaboration, and intelligent note management.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
