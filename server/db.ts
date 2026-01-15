@@ -82,6 +82,7 @@ export const initDb = async () => {
             faculty TEXT,
             subject TEXT,
             file_path TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY(user_id) REFERENCES users(id)
         );
     `);
