@@ -70,6 +70,20 @@ export const initDb = async () => {
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY(user_id) REFERENCES users(id)
         );
+
+        CREATE TABLE IF NOT EXISTS resources (
+            id TEXT PRIMARY KEY,
+            user_id TEXT,
+            title TEXT,
+            type TEXT,
+            department TEXT,
+            trimester TEXT,
+            year TEXT,
+            faculty TEXT,
+            subject TEXT,
+            file_path TEXT,
+            FOREIGN KEY(user_id) REFERENCES users(id)
+        );
     `);
     console.log('Tables created or verified.');
 
