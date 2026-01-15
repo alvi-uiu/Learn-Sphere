@@ -77,6 +77,19 @@ export interface Note {
   isAiSynthesized: boolean;
 }
 
+export interface Resource {
+  id: string;
+  title: string;
+  type: 'Note' | 'Slide' | 'Question Bank';
+  department: string;
+  trimester: string;
+  year: string;
+  faculty: string;
+  subject: string;
+  file_path: string;
+  created_at: string;
+}
+
 export interface ChatMessage {
   role: 'user' | 'model';
   text: string;
