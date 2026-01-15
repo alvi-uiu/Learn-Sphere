@@ -44,6 +44,33 @@ export const db = {
         return res.json();
     },
 
+    // Resources
+    getResources: async (filters: any): Promise<Resource[]> => {
+        // Filter out empty/null values
+        const cleanFilters: any = {};
+        Object.keys(filters).forEach(key => {
+            if (filters[key] && filters[key] !== 'All') {
+                cleanFilters[key] = filters[key];
+            }
+        });
+        const params = new URLSearchParams(cleanFilters);
+        const res = await fetch(`${API_URL}/resources?${params}`);
+        return res.json();
+    },
+
+    uploadResource: async (formData: FormData): Promise<any> => {
+        const res = await fetch(`${API_URL}/resources`, {
+            method: 'POST',
+            body: formData
+        });
+        if (!res.ok) {
+            const errorText = await res.text();
+            console.error('Upload Error Details:', errorText);
+            throw new Error(`Upload failed: ${res.status} ${res.statusText} - ${errorText}`);
+        }
+        return res.json();
+    },
+
     // Auth
     login: async (credentials: any): Promise<User> => {
         const res = await fetch(`${API_URL}/auth/login`, {
