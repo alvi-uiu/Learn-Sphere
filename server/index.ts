@@ -3,10 +3,51 @@ import express from 'express';
 import cors from 'cors';
 import { initDb, getDb } from './db';
 import { v4 as uuidv4 } from 'uuid';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
+
+// Serve static files from uploads
+const uploadsDir = path.join(__dirname, '../uploads');
+if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+}
+app.use('/uploads', express.static(uploadsDir));
+
+// Multer Storage Configuration
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        const { department, year, subject } = req.body;
+        // Sanitize path components to prevent security issues
+        const safeDept = (department || 'General').replace(/[^a-z0-9]/gi, '_');
+        const safeYear = (year || 'Unknown').replace(/[^a-z0-9]/gi, '_');
+        const safeSubj = (subject || 'Misc').replace(/[^a-z0-9]/gi, '_');
+
+        const targetDir = path.join(uploadsDir, 'resources', safeDept, safeYear, safeSubj);
+
+        if (!fs.existsSync(targetDir)) {
+            fs.mkdirSync(targetDir, { recursive: true });
+        }
+        cb(null, targetDir);
+    },
+    filename: (req, file, cb) => {
+        // Keep original extension, sanitize name
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        const ext = path.extname(file.originalname);
+        const name = path.basename(file.originalname, ext).replace(/[^a-z0-9]/gi, '_');
+        cb(null, name + '-' + uniqueSuffix + ext);
+    }
+});
+
+const upload = multer({ storage });
 
 const PORT = 3001;
 

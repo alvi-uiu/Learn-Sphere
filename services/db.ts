@@ -1,4 +1,4 @@
-import { Post, Note, User } from '../types';
+import { Post, Note, User, Resource } from '../types';
 
 const API_URL = '/api';
 
