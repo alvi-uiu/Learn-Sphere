@@ -55,9 +55,11 @@ export const initDb = async () => {
             user_name TEXT,
             user_avatar TEXT,
             content TEXT,
+            parent_id TEXT,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY(post_id) REFERENCES posts(id),
-            FOREIGN KEY(user_id) REFERENCES users(id)
+            FOREIGN KEY(user_id) REFERENCES users(id),
+            FOREIGN KEY(parent_id) REFERENCES comments(id)
         );
 
         CREATE TABLE IF NOT EXISTS notes (

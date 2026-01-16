@@ -8,7 +8,9 @@ export enum AppView {
   ADMIN = 'admin',
   LOGIN = 'login',
   REGISTER = 'register',
-  PROFILE = 'profile'
+  PROFILE = 'profile',
+  SETTINGS = 'settings',
+  NOTIFICATIONS = 'notifications'
 }
 
 export interface User {

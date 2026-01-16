@@ -111,10 +111,45 @@ export const db = {
         const res = await fetch(`${API_URL}/posts/${postId}/comments`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(commentData)
+            body: JSON.stringify({
+                userId: commentData.userId,
+                userName: commentData.userName,
+                userAvatar: commentData.userAvatar,
+                content: commentData.content,
+                parentId: commentData.parentId || null
+            })
         });
         if (!res.ok) throw new Error('Failed to add comment');
         return res.json();
+    },
+
+    // Save Post
+    savePost: async (postId: string, userId: string): Promise<string[]> => {
+        const res = await fetch(`${API_URL}/posts/${postId}/save`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId })
+        });
+        if (!res.ok) throw new Error('Failed to save post');
+        return res.json();
+    },
+
+    // Edit Post
+    editPost: async (postId: string, content: string): Promise<void> => {
+        const res = await fetch(`${API_URL}/posts/${postId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ content })
+        });
+        if (!res.ok) throw new Error('Failed to edit post');
+    },
+
+    // Delete Post
+    deletePost: async (postId: string): Promise<void> => {
+        const res = await fetch(`${API_URL}/posts/${postId}`, {
+            method: 'DELETE'
+        });
+        if (!res.ok) throw new Error('Failed to delete post');
     },
 
     // User (Local State Helper)

@@ -15,7 +15,7 @@ const pdfParse = typeof pdfParseLib === 'function' ? pdfParseLib : (pdfParseLib.
 import { GoogleGenAI } from '@google/genai';
 import 'dotenv/config';
 
-const genAI = new GoogleGenAI({ apiKey: process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY || '' });
+const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || '' });
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -194,13 +194,13 @@ app.get('/api/posts/:id/comments', async (req, res) => {
 app.post('/api/posts/:id/comments', async (req, res) => {
     const db = getDb();
     const { id: postId } = req.params;
-    const { userId, userName, userAvatar, content } = req.body;
+    const { userId, userName, userAvatar, content, parentId } = req.body;
     const commentId = uuidv4();
 
     try {
         await db.run(
-            `INSERT INTO comments (id, post_id, user_id, user_name, user_avatar, content, created_at) VALUES (?, ?, ?, ?, ?, ?, datetime('now'))`,
-            [commentId, postId, userId, userName, userAvatar, content]
+            `INSERT INTO comments (id, post_id, user_id, user_name, user_avatar, content, parent_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+            [commentId, postId, userId, userName, userAvatar, content, parentId || null]
         );
         // Update comment count on post (optional for performance, but good for UI)
         await db.run('UPDATE posts SET comments = comments + 1 WHERE id = ?', postId);
