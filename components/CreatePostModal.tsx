@@ -53,7 +53,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({ isOpen, onClos
                     type
                 }]);
             };
-            reader.readAsDataURL(file);
+            reader.readAsDataURL(file as Blob);
         });
     };
 
@@ -87,14 +87,14 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({ isOpen, onClos
             } : undefined;
 
             await db.createPost({
-                author: user.name,
-                authorId: user.id || 'u_anon',
-                avatar: user.avatar,
+                author: user?.name,
+                authorId: user?.id || 'u_anon',
+                avatar: user?.avatar,
                 content,
                 category,
                 sessionData: finalSessionData,
                 attachments: processedAttachments
-            });
+            } as any);
 
             showToast('Post created successfully!', 'success');
             onPostCreated();
@@ -124,10 +124,10 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({ isOpen, onClos
 
                     {/* User Info */}
                     <div className="flex items-center gap-3">
-                        <img src={user.avatar} alt={user.name} className="w-10 h-10 rounded-full border border-white/10" />
+                        <img src={user?.avatar || "https://picsum.photos/seed/user1/40/40"} alt={user?.name || "User"} className="w-10 h-10 rounded-full border border-white/10" />
                         <div>
-                            <p className="font-semibold text-sm text-white">{user.name}</p>
-                            <p className="text-xs text-gray-500">{user.role || 'Student'}</p>
+                            <p className="font-semibold text-sm text-white">{user?.name || 'Guest'}</p>
+                            <p className="text-xs text-gray-500">{user?.role || 'Student'}</p>
                         </div>
                     </div>
 
@@ -208,7 +208,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({ isOpen, onClos
                     <textarea
                         value={content}
                         onChange={(e) => setContent(e.target.value)}
-                        placeholder={`What's on your mind, ${user.name.split(' ')[0]}?`}
+                        placeholder={`What's on your mind, ${user?.name?.split(' ')[0] || 'Student'}?`}
                         className="w-full min-h-[120px] bg-transparent border-none focus:ring-0 text-sm placeholder:text-gray-600 resize-none p-0"
                     />
 
@@ -275,7 +275,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({ isOpen, onClos
                 <div className="p-4 bg-white/5 border-t border-white/5 flex justify-end">
                     <button
                         onClick={handleSubmit}
-                        disabled={loading || (!content.trim() && attachments.length === 0)}
+                        disabled={loading || (!content.trim() && attachments.length === 0 && !(category === 'Session' && (sessionData.courseName || sessionData.topics)))}
                         className="apple-gradient text-white px-8 py-2.5 rounded-xl font-bold text-sm shadow-lg shadow-apple-blue/20 disabled:opacity-50 min-w-[100px] flex justify-center"
                     >
                         {loading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Post'}
