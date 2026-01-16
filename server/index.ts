@@ -7,6 +7,15 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+const pdfParseLib = require('pdf-parse');
+// Check if it's the standard export or the object with PDFParse
+const pdfParse = typeof pdfParseLib === 'function' ? pdfParseLib : (pdfParseLib.PDFParse || pdfParseLib.default || pdfParseLib);
+import { GoogleGenAI } from '@google/genai';
+import 'dotenv/config';
+
+const genAI = new GoogleGenAI({ apiKey: process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY || '' });
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -257,10 +266,21 @@ app.post('/api/auth/register', async (req, res) => {
 // RESOURCES API
 app.get('/api/resources', async (req, res) => {
     const db = getDb();
-    const { department, trimester, year, faculty, subject, type } = req.query;
+    const { department, trimester, year, faculty, subject, type, source } = req.query;
 
     let query = 'SELECT * FROM resources WHERE 1=1';
     const params: any[] = [];
+
+    // Default to 'library' source if not specified.
+    // If source parameter is present, use it (could be 'chat', 'library', or 'all' logic if we implemented it).
+    // Here we strictly filter by source if provided, or default to NOT 'chat' (so null/library are shown).
+    if (source) {
+        query += ' AND source = ?';
+        params.push(source);
+    } else {
+        // Default for Library View: Should not show chat files
+        query += " AND (source IS NULL OR source = 'library')";
+    }
 
     if (department && department !== 'All') {
         query += ' AND department = ?';
@@ -298,13 +318,61 @@ app.get('/api/resources', async (req, res) => {
 });
 
 
+// Helper for PDF text extraction
+async function extractTextFromPDF(filePath: string): Promise<string | null> {
+    try {
+        console.log(`Parsing PDF: ${filePath}`);
+        const dataBuffer = fs.readFileSync(filePath);
+
+        // Path to standard fonts for PDF.js - MUST use forward slashes and end with trailing slash
+        let standardFontsPath = path.join(__dirname, '..', 'node_modules', 'pdfjs-dist', 'standard_fonts', '/');
+        standardFontsPath = standardFontsPath.replace(/\\/g, '/');
+        if (!standardFontsPath.endsWith('/')) standardFontsPath += '/';
+
+        let textContent = null;
+        // Handle different pdf-parse versions (Function vs Class)
+        if (pdfParse.prototype && pdfParse.prototype.getText) {
+            // Class-based
+            console.log("Using PDFParse Class");
+            const uint8Array = new Uint8Array(dataBuffer);
+            const parser = new pdfParse({
+                data: uint8Array,
+                standardFontDataUrl: standardFontsPath
+            });
+            const result = await parser.getText();
+            textContent = result.text;
+        } else {
+            // Function-based - standard pdf-parse
+            console.log("Using PDFParse Function");
+            const data = await pdfParse(dataBuffer);
+            textContent = data.text;
+        }
+
+        // Fallback strategy if extraction was unsuccessful or unreadable
+        if (!textContent || textContent.trim().length < 10) {
+            console.warn("PDF extraction suspicious or empty, trying fallback...");
+            if (typeof pdfParseLib === 'function') {
+                console.log("Fallback: Using pdfParseLib function");
+                const data = await pdfParseLib(dataBuffer);
+                textContent = data.text;
+            }
+        }
+
+        return textContent;
+    } catch (e) {
+        console.error('PDF Parse Error:', e);
+        return null;
+    }
+}
+
+
 app.post('/api/resources', upload.single('file'), async (req, res) => {
     console.log('Received upload request');
     console.log('Body:', req.body);
     console.log('File:', req.file);
 
     const db = getDb();
-    const { title, type, department, trimester, year, faculty, subject, userId } = req.body;
+    const { title, type, department, trimester, year, faculty, subject, userId, source } = req.body;
     const file = req.file;
 
     if (!file) {
@@ -315,16 +383,520 @@ app.post('/api/resources', upload.single('file'), async (req, res) => {
     // Relative path for frontend access
     const relativePath = '/uploads/' + path.relative(uploadsDir, file.path).replace(/\\/g, '/');
     const id = uuidv4();
+    const resourceSource = source || 'library'; // Default to library
+
+    let textContent = null;
+    if (file.mimetype === 'application/pdf') {
+        textContent = await extractTextFromPDF(file.path);
+        if (textContent && textContent.trim()) {
+            console.log(`Extracted ${textContent.length} characters from PDF.`);
+        } else {
+            console.warn("PDF extraction failed.");
+        }
+    } else {
+        console.log(`Skipping text extraction for mimetype: ${file.mimetype}`);
+    }
 
     try {
         await db.run(
-            `INSERT INTO resources (id, user_id, title, type, department, trimester, year, faculty, subject, file_path, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
-            [id, userId || 'u_me', title, type, department, trimester, year, faculty, subject, relativePath]
+            `INSERT INTO resources (id, user_id, title, type, department, trimester, year, faculty, subject, file_path, text_content, source, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+            [id, userId || 'u_me', title, type, department, trimester, year, faculty, subject, relativePath, textContent, resourceSource]
         );
-        console.log('Resource saved to DB:', id);
+        console.log('Resource saved to DB:', id, 'Source:', resourceSource);
         res.json({ success: true, id, file_path: relativePath });
     } catch (e) {
         console.error('DB Error during resource upload:', e);
+        res.status(500).json({ error: (e as Error).message });
+    }
+});
+
+app.post('/api/resources/:id/analyze', async (req, res) => {
+    const db = getDb();
+    const { id } = req.params;
+    const { mode } = req.body; // 'explain' or 'practice'
+
+    try {
+        const resource = await db.get('SELECT * FROM resources WHERE id = ?', id);
+        if (!resource) return res.status(404).json({ error: 'Resource not found' });
+
+        let content = resource.text_content;
+
+        // If no text content and it's a PDF, try on-the-fly extraction
+        if (!content && resource.file_path && resource.file_path.toLowerCase().endsWith('.pdf')) {
+            console.log("Attempting on-the-fly text extraction for existing PDF...");
+            const fullPath = path.join(__dirname, '..', resource.file_path);
+            if (fs.existsSync(fullPath)) {
+                content = await extractTextFromPDF(fullPath);
+                if (content) {
+                    // Update the DB so we don't have to parse it again
+                    await db.run('UPDATE resources SET text_content = ? WHERE id = ?', [content, id]);
+                }
+            }
+        }
+
+        if (!content) {
+            return res.status(400).json({ error: 'This resource has no readable text. Make sure it is a PDF with selectable text or a valid note.' });
+        }
+
+        let prompt = "";
+        if (mode === 'explain') {
+            prompt = `
+                You are LearnSphere AI, an elite academic tutor. 
+                
+                USER OBJECTIVE: I want to understand this material perfectly. Explain it to me using "huge terms" made simple, using easy words and clear steps.
+                
+                YOUR TASK:
+                1. Provide a "Big Picture" summary of what this document is about.
+                2. Identify and explain 3-5 key concepts from the text.
+                3. Break down ANY complex jargon or technical terms into simple, every-day language.
+                4. Use a friendly, encouraging tone.
+                
+                FORMATTING RULES:
+                - Use clear Markdown headers (##) for sections.
+                - Use **bold** for important definitions.
+                - Use bullet points for readability.
+                - If there are equations or formulas, explain them in plain English.
+                
+                CONTENT TO EXPLAIN:
+                ---
+                ${content.slice(0, 35000)}
+                ---
+            `;
+        } else if (mode === 'practice') {
+            prompt = `
+                You are LearnSphere AI, a professional academic examiner. 
+                
+                USER OBJECTIVE: I want to practice and test my knowledge on this specific material.
+                
+                YOUR TASK:
+                1. Create a "Study Prep" set based ONLY on the provided content.
+                2. Include 3 Multiple Choice Questions (MCQs) with 4 options each (mark them A, B, C, D).
+                3. Include 2 Short Answer Questions that require critical thinking about the text.
+                4. Provide a clearly labeled "ANSWER KEY" at the very end with brief explanations for why the MCQ answers are correct.
+                
+                FORMATTING RULES:
+                - Use clear Markdown headers.
+                - Keep the questions challenging but fair.
+                
+                CONTENT FOR QUESTIONS:
+                ---
+                ${content.slice(0, 35000)}
+                ---
+            `;
+        } else {
+            return res.status(400).json({ error: 'Invalid analysis mode' });
+        }
+
+        const response = await genAI.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: [{ role: 'user', parts: [{ text: prompt }] }]
+        });
+
+        const text = response.text || "No response generated";
+        res.json({ text });
+    } catch (e) {
+        console.error('AI Analysis Error:', e);
+        res.status(500).json({ error: (e as Error).message });
+    }
+});
+
+// AI TUTOR API
+
+// Get Chat History
+// Get All Chat Threads for User
+app.get('/api/chats', async (req, res) => {
+    const db = getDb();
+    const { userId } = req.query;
+    try {
+        const chats = await db.all('SELECT * FROM chats WHERE user_id = ? ORDER BY updated_at DESC', [userId || 'u_me']);
+        res.json(chats);
+    } catch (e) {
+        res.status(500).json({ error: (e as Error).message });
+    }
+});
+
+// Get Messages for specific Chat
+app.get('/api/chats/:id/messages', async (req, res) => {
+    const db = getDb();
+    const { id } = req.params;
+    try {
+        const messages = await db.all('SELECT * FROM chat_messages WHERE chat_id = ? ORDER BY created_at ASC', id);
+        res.json(messages.map(m => ({ role: m.role, text: m.content })));
+    } catch (e) {
+        res.status(500).json({ error: (e as Error).message });
+    }
+});
+
+// Delete Chat
+app.delete('/api/chats/:id', async (req, res) => {
+    const db = getDb();
+    const { id } = req.params;
+    try {
+        await db.run('DELETE FROM chat_messages WHERE chat_id = ?', id);
+        await db.run('DELETE FROM chats WHERE id = ?', id);
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: (e as Error).message });
+    }
+});
+
+// Send Message (Supports chatId)
+app.post('/api/chat', async (req, res) => {
+    console.log("POST /api/chat received:", req.body);
+    const db = getDb();
+    const { message, userId, mode, chatId } = req.body;
+    const uId = userId || 'u_me';
+
+    if (!process.env.VITE_GEMINI_API_KEY && !process.env.GEMINI_API_KEY) {
+        return res.status(500).json({ error: "Server Configuration Error: Missing API Key" });
+    }
+
+    try {
+        let chat;
+        let cId = chatId;
+
+        // 1. Get or Create Chat Session
+        if (cId) {
+            chat = await db.get('SELECT * FROM chats WHERE id = ?', [cId]);
+        }
+
+        if (!chat) {
+            cId = uuidv4();
+            // Generate a title based on the first few words of the message
+            const title = message.split(' ').slice(0, 5).join(' ') + '...';
+            await db.run('INSERT INTO chats (id, user_id, title) VALUES (?, ?, ?)', [cId, uId, title]);
+            chat = { id: cId };
+        } else {
+            // Update timestamp
+            await db.run('UPDATE chats SET updated_at = datetime(\'now\') WHERE id = ?', [cId]);
+        }
+
+        // 2. Save User Message
+        const userMsgId = uuidv4();
+        await db.run('INSERT INTO chat_messages (id, chat_id, role, content) VALUES (?, ?, ?, ?)', [userMsgId, cId, 'user', message]);
+
+        // 3. Build Context (History + Resources)
+        const historyRows = await db.all('SELECT role, content FROM chat_messages WHERE chat_id = ? ORDER BY created_at ASC', cId);
+        const history = historyRows.map(r => ({
+            role: r.role === 'user' ? 'user' : 'model',
+            parts: [{ text: r.content }]
+        }));
+
+        let systemInstruction = "You are LearnSphere AI Tutor. Be encouraging, explain complex concepts step-by-step. Use Markdown.";
+
+        if (mode === 'resource') {
+            // RAG: Fetch user resources
+            const resources = await db.all('SELECT title, text_content FROM resources WHERE user_id = ? AND text_content IS NOT NULL', [uId]);
+            const contextText = resources.map(r => `Document: ${r.title}\nContent: ${r.text_content}`).join('\n\n');
+
+            if (contextText) {
+                const safeContext = contextText.slice(0, 100000);
+                systemInstruction += `\n\nIMPORTANT: You have access to the following student's academic resources. Answer the user's question STRICTLY based on these resources if possible. If the answer is not in the resources, state that you couldn't find it in the uploaded documents.\n\n---CONTEXT---\n${safeContext}\n---END CONTEXT---`;
+            } else {
+                systemInstruction += "\n\nThe user wanted to ask about resources, but no readable resources (PDFs with text) were found.";
+            }
+        }
+
+        // 4. Generate Response
+        const response = await genAI.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: history,
+            config: { systemInstruction: systemInstruction }
+        });
+
+        const responseText = response.text || "No response generated";
+
+        // 5. Save Model Response
+        const botMsgId = uuidv4();
+        await db.run('INSERT INTO chat_messages (id, chat_id, role, content) VALUES (?, ?, ?, ?)', [botMsgId, cId, 'model', responseText]);
+
+        res.json({ role: 'model', text: responseText, chatId: cId });
+
+    } catch (e) {
+        console.error("AI Error:", e);
+        res.status(500).json({ error: (e as Error).message });
+    }
+});
+
+// PROJECTS API
+app.get('/api/projects', async (req, res) => {
+    const db = getDb();
+    try {
+        const projects = await db.all(`
+            SELECT p.*, u.name as current_owner_name 
+            FROM projects p 
+            LEFT JOIN users u ON p.owner_id = u.id 
+            ORDER BY p.created_at DESC
+        `);
+
+        // Enrich projects with member count and progress
+        const enrichedProjects = await Promise.all(projects.map(async (p) => {
+            const members = await db.all('SELECT * FROM project_members WHERE project_id = ?', p.id);
+            const tasks = await db.all('SELECT * FROM project_tasks WHERE project_id = ?', p.id);
+
+            const totalTasks = tasks.length;
+            const doneTasks = tasks.filter(t => t.status === 'Done').length;
+            const percentage = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0;
+
+            return {
+                ...p,
+                ownerName: p.current_owner_name || p.owner_name, // Use current user name or fallback to snapshot
+                tags: p.tags ? JSON.parse(p.tags) : [],
+                lookingFor: p.looking_for ? JSON.parse(p.looking_for) : [],
+                memberCount: members.length,
+                percentage
+            };
+        }));
+
+        const stats = {
+            totalProjects: projects.length,
+            completedProjects: projects.filter(p => p.status === 'Completed').length,
+            totalParticipants: enrichedProjects.reduce((acc, p) => acc + (p.memberCount || 0), 0)
+        };
+
+        res.json({ projects: enrichedProjects, stats });
+    } catch (e) {
+        res.status(500).json({ error: (e as Error).message });
+    }
+});
+
+app.post('/api/projects', async (req, res) => {
+    const db = getDb();
+    const { ownerId, ownerName, ownerAvatar, title, description, trimester, year, tags, lookingFor, membersNeeded } = req.body;
+    const id = uuidv4();
+    try {
+        await db.run(
+            `INSERT INTO projects (id, owner_id, owner_name, owner_avatar, title, description, trimester, year, tags, looking_for, members_needed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [id, ownerId, ownerName, ownerAvatar, title, description, trimester, year, JSON.stringify(tags || []), JSON.stringify(lookingFor || []), membersNeeded || 1]
+        );
+
+        // Add owner as Lead member automatically
+        await db.run(
+            'INSERT INTO project_members (project_id, user_id, user_name, user_avatar, student_id, role) VALUES (?, ?, ?, ?, ?, ?)',
+            [id, ownerId, ownerName, ownerAvatar, req.body.ownerStudentId || '', 'Leader']
+        );
+
+        console.log('Project created successfully:', id);
+        res.json({ success: true, id });
+    } catch (e) {
+        console.error('Error creating project:', e);
+        res.status(500).json({ error: (e as Error).message });
+    }
+});
+
+app.get('/api/projects/:id', async (req, res) => {
+    const db = getDb();
+    const { id } = req.params;
+    try {
+        const project = await db.get(`
+            SELECT p.*, u.name as current_owner_name 
+            FROM projects p 
+            LEFT JOIN users u ON p.owner_id = u.id 
+            WHERE p.id = ?
+        `, id);
+        if (!project) return res.status(404).json({ error: 'Project not found' });
+
+        const members = await db.all(`
+            SELECT pm.*, u.name as current_name, u.avatar as current_avatar 
+            FROM project_members pm 
+            LEFT JOIN users u ON pm.user_id = u.id 
+            WHERE pm.project_id = ?
+        `, id);
+        const tasks = await db.all('SELECT * FROM project_tasks WHERE project_id = ? ORDER BY created_at ASC', id);
+        const updates = await db.all('SELECT * FROM project_updates WHERE project_id = ? ORDER BY created_at DESC', id);
+
+        // Calculate progress
+        const totalTasks = tasks.length;
+        const doneTasks = tasks.filter(t => t.status === 'Done').length;
+        const percentage = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0;
+
+        // Map members to camelCase and use latest user data
+        const mappedMembers = members.map(m => ({
+            userId: m.user_id,
+            userName: m.current_name || m.user_name,
+            userAvatar: m.current_avatar || m.user_avatar,
+            student_id: m.student_id,
+            role: m.role === 'Lead' ? 'Leader' : m.role
+        }));
+
+        res.json({
+            ...project,
+            ownerName: project.current_owner_name || project.owner_name,
+            tags: project.tags ? JSON.parse(project.tags) : [],
+            lookingFor: project.looking_for ? JSON.parse(project.looking_for) : [],
+            members: mappedMembers,
+            tasks,
+            updates,
+            percentage
+        });
+    } catch (e) {
+        res.status(500).json({ error: (e as Error).message });
+    }
+});
+
+app.put('/api/projects/:id', async (req, res) => {
+    const db = getDb();
+    const { id } = req.params;
+    const { status, title, description, membersNeeded, trimester, year, tags, lookingFor } = req.body;
+    try {
+        if (status) await db.run('UPDATE projects SET status = ? WHERE id = ?', [status, id]);
+        if (title) await db.run('UPDATE projects SET title = ? WHERE id = ?', [title, id]);
+        if (description) await db.run('UPDATE projects SET description = ? WHERE id = ?', [description, id]);
+        if (membersNeeded !== undefined) await db.run('UPDATE projects SET members_needed = ? WHERE id = ?', [membersNeeded, id]);
+        if (trimester) await db.run('UPDATE projects SET trimester = ? WHERE id = ?', [trimester, id]);
+        if (year) await db.run('UPDATE projects SET year = ? WHERE id = ?', [year, id]);
+        if (tags) await db.run('UPDATE projects SET tags = ? WHERE id = ?', [JSON.stringify(tags), id]);
+        if (lookingFor) await db.run('UPDATE projects SET looking_for = ? WHERE id = ?', [JSON.stringify(lookingFor), id]);
+
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: (e as Error).message });
+    }
+});
+
+app.delete('/api/projects/:id', async (req, res) => {
+    const db = getDb();
+    const { id } = req.params;
+    try {
+        await db.run('DELETE FROM projects WHERE id = ?', id);
+        await db.run('DELETE FROM project_members WHERE project_id = ?', id);
+        await db.run('DELETE FROM project_tasks WHERE project_id = ?', id);
+        await db.run('DELETE FROM project_updates WHERE project_id = ?', id);
+        await db.run('DELETE FROM project_applications WHERE project_id = ?', id);
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: (e as Error).message });
+    }
+});
+
+// MEMBERS
+app.post('/api/projects/:id/members', async (req, res) => {
+    const db = getDb();
+    const { id: projectId } = req.params;
+    const { userId, userName, userAvatar, role } = req.body;
+    try {
+        await db.run(
+            `INSERT INTO project_members (project_id, user_id, user_name, user_avatar, role) VALUES (?, ?, ?, ?, ?)`,
+            [projectId, userId, userName, userAvatar, role || 'Contributor']
+        );
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: (e as Error).message });
+    }
+});
+
+app.delete('/api/projects/:id/members/:userId', async (req, res) => {
+    const db = getDb();
+    const { id, userId } = req.params;
+    try {
+        await db.run('DELETE FROM project_members WHERE project_id = ? AND user_id = ?', [id, userId]);
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: (e as Error).message });
+    }
+});
+
+// APPLICATIONS
+app.get('/api/projects/:id/applications', async (req, res) => {
+    const db = getDb();
+    const { id } = req.params;
+    try {
+        const applications = await db.all('SELECT * FROM project_applications WHERE project_id = ? ORDER BY created_at DESC', id);
+        res.json(applications);
+    } catch (e) {
+        res.status(500).json({ error: (e as Error).message });
+    }
+});
+
+app.post('/api/projects/:id/applications', async (req, res) => {
+    const db = getDb();
+    const { id: projectId } = req.params;
+    const { userId, userName, userAvatar, studentId, phoneNumber, description } = req.body;
+    const id = uuidv4();
+    try {
+        await db.run(
+            `INSERT INTO project_applications (id, project_id, user_id, user_name, user_avatar, student_id, phone_number, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [id, projectId, userId, userName, userAvatar, studentId, phoneNumber, description]
+        );
+        res.json({ success: true, id });
+    } catch (e) {
+        res.status(500).json({ error: (e as Error).message });
+    }
+});
+
+app.put('/api/projects/:id/applications/:appId', async (req, res) => {
+    const db = getDb();
+    const { id: projectId, appId } = req.params;
+    const { status } = req.body; // Accepted or Rejected
+    try {
+        await db.run('UPDATE project_applications SET status = ? WHERE id = ?', [status, appId]);
+
+        if (status === 'Accepted') {
+            const app = await db.get('SELECT * FROM project_applications WHERE id = ?', appId);
+            await db.run(
+                'INSERT OR IGNORE INTO project_members (project_id, user_id, user_name, user_avatar, student_id, role) VALUES (?, ?, ?, ?, ?, ?)',
+                [projectId, app.user_id, app.user_name, app.user_avatar, app.student_id, 'Contributor']
+            );
+        }
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: (e as Error).message });
+    }
+});
+
+// TASKS
+app.post('/api/projects/:id/tasks', async (req, res) => {
+    const db = getDb();
+    const { id: projectId } = req.params;
+    const { title, description, assignedTo, assignedName, assignedAvatar, dueDate } = req.body;
+    const id = uuidv4();
+    try {
+        await db.run(
+            `INSERT INTO project_tasks (id, project_id, title, description, assigned_to, assigned_name, assigned_avatar, due_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [id, projectId, title, description, assignedTo, assignedName, assignedAvatar, dueDate]
+        );
+        res.json({ success: true, id });
+    } catch (e) {
+        res.status(500).json({ error: (e as Error).message });
+    }
+});
+
+app.put('/api/projects/:projectId/tasks/:taskId', async (req, res) => {
+    const db = getDb();
+    const { taskId } = req.params;
+    const { status } = req.body;
+    try {
+        await db.run('UPDATE project_tasks SET status = ? WHERE id = ?', [status, taskId]);
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: (e as Error).message });
+    }
+});
+
+app.delete('/api/projects/:projectId/tasks/:taskId', async (req, res) => {
+    const db = getDb();
+    const { taskId } = req.params;
+    try {
+        await db.run('DELETE FROM project_tasks WHERE id = ?', taskId);
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: (e as Error).message });
+    }
+});
+
+// UPDATES
+app.post('/api/projects/:id/updates', async (req, res) => {
+    const db = getDb();
+    const { id: projectId } = req.params;
+    const { userId, userName, userAvatar, content } = req.body;
+    const id = uuidv4();
+    try {
+        await db.run(
+            `INSERT INTO project_updates (id, project_id, user_id, user_name, user_avatar, content) VALUES (?, ?, ?, ?, ?, ?)`,
+            [id, projectId, userId, userName, userAvatar, content]
+        );
+        res.json({ success: true, id });
+    } catch (e) {
         res.status(500).json({ error: (e as Error).message });
     }
 });
