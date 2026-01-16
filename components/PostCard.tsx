@@ -49,6 +49,15 @@ export const PostCard: React.FC<PostCardProps> = ({ post: initialPost, currentUs
     const [isEditing, setIsEditing] = useState(false);
     const [editContent, setEditContent] = useState(post.content);
 
+    const resolvedUser = currentUser?.id
+        ? currentUser
+        : JSON.parse(localStorage.getItem('user') || '{}');
+    const commentUser = {
+        id: (resolvedUser?.id as string | undefined) || 'u_alex',
+        name: (resolvedUser?.name as string | undefined) || 'Student',
+        avatar: (resolvedUser?.avatar as string | undefined)
+    };
+
     // Like Handler
     const handleLike = async () => {
         // Optimistic
@@ -141,12 +150,12 @@ export const PostCard: React.FC<PostCardProps> = ({ post: initialPost, currentUs
     };
 
     const handleCreateComment = async () => {
-        if (!newComment.trim() || !currentUser.id) return;
+        if (!newComment.trim()) return;
         try {
             await db.addComment(post.id, {
-                userId: currentUser.id,
-                userName: currentUser.name,
-                userAvatar: currentUser.avatar,
+                userId: commentUser.id,
+                userName: commentUser.name,
+                userAvatar: commentUser.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(commentUser.name)}`,
                 content: newComment,
                 parentId: null
             });
@@ -161,12 +170,12 @@ export const PostCard: React.FC<PostCardProps> = ({ post: initialPost, currentUs
     };
 
     const handleReply = async (parentId: string) => {
-        if (!replyContent.trim() || !currentUser.id) return;
+        if (!replyContent.trim()) return;
         try {
             await db.addComment(post.id, {
-                userId: currentUser.id,
-                userName: currentUser.name,
-                userAvatar: currentUser.avatar,
+                userId: commentUser.id,
+                userName: commentUser.name,
+                userAvatar: commentUser.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(commentUser.name)}`,
                 content: replyContent,
                 parentId: parentId
             });
@@ -456,7 +465,11 @@ export const PostCard: React.FC<PostCardProps> = ({ post: initialPost, currentUs
 
                     {/* New Comment Input */}
                     <div className="flex gap-3 mt-4">
-                        <img src={currentUser.avatar || "https://picsum.photos/seed/user1/40/40"} className="w-8 h-8 rounded-full" />
+                        <img
+                            src={commentUser.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(commentUser.name || 'Student')}`}
+                            className="w-8 h-8 rounded-full"
+                            alt="Comment author"
+                        />
                         <div className="flex-1 relative">
                             <input
                                 type="text"
