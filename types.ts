@@ -55,17 +55,57 @@ export interface Post {
 
 export interface Project {
   id: string;
+  owner_id: string;
+  owner_name: string;
+  owner_avatar: string;
+  ownerName: string; // Compatibility
+  ownerAvatar: string; // Compatibility
   title: string;
   description: string;
-  author: string;
-  authorId: string;
-  avatar: string;
-  tags: string[];
-  lookingFor: string[];
-  likes: number;
-  comments: number;
+  trimester: string;
+  year: string;
   status: 'Open' | 'In Progress' | 'Completed';
-  timestamp: string;
+  tags: string[];
+  looking_for?: string[];
+  lookingFor?: string[]; // Compatibility
+  members_needed: number;
+  membersNeeded?: number; // Compatibility
+  memberCount?: number;
+  percentage?: number;
+  createdAt: string;
+}
+
+export interface ProjectMember {
+  projectId: string;
+  userId: string;
+  userName: string;
+  userAvatar: string;
+  student_id?: string;
+  role: 'Leader' | 'Contributor' | 'Reviewer' | 'Dev' | 'Designer' | 'Researcher';
+}
+
+export interface ProjectTask {
+  id: string;
+  projectId: string;
+  title: string;
+  description: string;
+  assignedTo?: string;
+  assigned_to?: string; // Backend compatibility
+  assignedName?: string;
+  assignedAvatar?: string;
+  status: 'Todo' | 'Done';
+  dueDate?: string;
+  createdAt?: string;
+}
+
+export interface ProjectUpdate {
+  id: string;
+  projectId: string;
+  userId: string;
+  userName: string;
+  userAvatar: string;
+  content: string;
+  created_at: string;
 }
 
 export interface Note {
