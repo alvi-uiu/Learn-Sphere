@@ -87,6 +87,7 @@ export interface Resource {
   faculty: string;
   subject: string;
   file_path: string;
+  text_content?: string;
   created_at: string;
 }
 
