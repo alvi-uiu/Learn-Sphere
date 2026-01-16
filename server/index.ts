@@ -254,6 +254,81 @@ app.post('/api/auth/register', async (req, res) => {
     }
 });
 
+// RESOURCES API
+app.get('/api/resources', async (req, res) => {
+    const db = getDb();
+    const { department, trimester, year, faculty, subject, type } = req.query;
+
+    let query = 'SELECT * FROM resources WHERE 1=1';
+    const params: any[] = [];
+
+    if (department && department !== 'All') {
+        query += ' AND department = ?';
+        params.push(department);
+    }
+    if (trimester && trimester !== 'All') {
+        query += ' AND trimester = ?';
+        params.push(trimester);
+    }
+    if (year && year !== 'All') {
+        query += ' AND year = ?';
+        params.push(year);
+    }
+    if (faculty && faculty !== 'All') {
+        query += ' AND faculty = ?';
+        params.push(faculty);
+    }
+    if (subject && subject !== 'All') {
+        query += ' AND subject LIKE ?';
+        params.push(`%${subject}%`);
+    }
+    if (type && type !== 'All') {
+        query += ' AND type = ?';
+        params.push(type);
+    }
+
+    query += ' ORDER BY created_at DESC';
+
+    try {
+        const resources = await db.all(query, params);
+        res.json(resources);
+    } catch (e) {
+        res.status(500).json({ error: (e as Error).message });
+    }
+});
+
+
+app.post('/api/resources', upload.single('file'), async (req, res) => {
+    console.log('Received upload request');
+    console.log('Body:', req.body);
+    console.log('File:', req.file);
+
+    const db = getDb();
+    const { title, type, department, trimester, year, faculty, subject, userId } = req.body;
+    const file = req.file;
+
+    if (!file) {
+        console.error('No file in request');
+        return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    // Relative path for frontend access
+    const relativePath = '/uploads/' + path.relative(uploadsDir, file.path).replace(/\\/g, '/');
+    const id = uuidv4();
+
+    try {
+        await db.run(
+            `INSERT INTO resources (id, user_id, title, type, department, trimester, year, faculty, subject, file_path, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+            [id, userId || 'u_me', title, type, department, trimester, year, faculty, subject, relativePath]
+        );
+        console.log('Resource saved to DB:', id);
+        res.json({ success: true, id, file_path: relativePath });
+    } catch (e) {
+        console.error('DB Error during resource upload:', e);
+        res.status(500).json({ error: (e as Error).message });
+    }
+});
+
 // INIT
 initDb().then(() => {
     app.listen(PORT, () => {
