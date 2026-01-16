@@ -62,11 +62,11 @@ const App: React.FC = () => {
 
   const renderView = () => {
     switch (activeView) {
-      case AppView.HOME: return <HomeView />;
+      case AppView.HOME: return <HomeView user={user} />;
       case AppView.TUTOR: return <TutorView />;
       case AppView.LIBRARY: return <LibraryView />;
       case AppView.ADMIN: return <AdminView />;
-      case AppView.PROJECTS: return <ProjectsView />;
+      case AppView.PROJECTS: return <ProjectsView user={user} />;
       default: return <HomeView />;
     }
   };
