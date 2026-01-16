@@ -17,31 +17,26 @@ const MOCK_POSTS: Post[] = []; // Removed, mock data is now in db service
 
 import { formatRelativeTime } from '../utils/date';
 
-export const HomeView: React.FC = () => {
+interface HomeViewProps {
+  user: any;
+}
+
+export const HomeView: React.FC<HomeViewProps> = ({ user }) => {
   const { showToast } = useToast();
   const [posts, setPosts] = useState<Post[]>(MOCK_POSTS);
 
   // Comments State (Handled by PostCard now)
-  const [currentUser, setCurrentUser] = useState<any>({});
+  const [currentUser, setCurrentUser] = useState<any>(user || {});
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [filter, setFilter] = useState('All');
   const FILTERS = ['All', 'Academic', 'Motivational', 'Tips', 'Session', 'Saved'];
 
   useEffect(() => {
-    const loadPosts = async () => {
-      const user = JSON.parse(localStorage.getItem('user') || '{}');
+    if (user) {
       setCurrentUser(user);
-      if (user.id) {
-        const res = await fetch(`http://localhost:3001/api/posts?userId=${user.id}`);
-        const data = await res.json();
-        setPosts(data);
-      } else {
-        const data = await db.getPosts();
-        setPosts(data);
-      }
-    };
+    }
     loadPosts();
-  }, []);
+  }, [user]);
 
   const loadPosts = async () => {
     const user = JSON.parse(localStorage.getItem('user') || '{}');

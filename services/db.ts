@@ -59,6 +59,10 @@ export const db = {
     },
 
     uploadResource: async (formData: FormData): Promise<any> => {
+        if (!formData.has('userId')) {
+            formData.append('userId', 'u_alex');
+        }
+        // Source will be 'chat' or 'library' (default 'library' in backend if missing)
         const res = await fetch(`${API_URL}/resources`, {
             method: 'POST',
             body: formData
