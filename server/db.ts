@@ -82,10 +82,128 @@ export const initDb = async () => {
             faculty TEXT,
             subject TEXT,
             file_path TEXT,
+            text_content TEXT,
+            text_content TEXT,
+            source TEXT DEFAULT 'library',
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY(user_id) REFERENCES users(id)
         );
+
+        CREATE TABLE IF NOT EXISTS projects (
+            id TEXT PRIMARY KEY,
+            owner_id TEXT,
+            owner_name TEXT,
+            owner_avatar TEXT,
+            title TEXT,
+            description TEXT,
+            trimester TEXT,
+            year TEXT,
+            status TEXT DEFAULT 'Open',
+            tags TEXT, -- JSON array
+            looking_for TEXT, -- JSON array
+            members_needed INTEGER DEFAULT 1,
+            likes INTEGER DEFAULT 0,
+            comments INTEGER DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(owner_id) REFERENCES users(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS project_members (
+            project_id TEXT,
+            user_id TEXT,
+            user_name TEXT,
+            user_avatar TEXT,
+            student_id TEXT,
+            role TEXT,
+            PRIMARY KEY (project_id, user_id),
+            FOREIGN KEY(project_id) REFERENCES projects(id),
+            FOREIGN KEY(user_id) REFERENCES users(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS project_tasks (
+            id TEXT PRIMARY KEY,
+            project_id TEXT,
+            title TEXT,
+            description TEXT,
+            assigned_to TEXT,
+            assigned_name TEXT,
+            assigned_avatar TEXT,
+            status TEXT DEFAULT 'Todo',
+            due_date TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(project_id) REFERENCES projects(id),
+            FOREIGN KEY(assigned_to) REFERENCES users(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS project_updates (
+            id TEXT PRIMARY KEY,
+            project_id TEXT,
+            user_id TEXT,
+            user_name TEXT,
+            user_avatar TEXT,
+            content TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(project_id) REFERENCES projects(id),
+            FOREIGN KEY(user_id) REFERENCES users(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS chats (
+            id TEXT PRIMARY KEY,
+            user_id TEXT,
+            title TEXT,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(user_id) REFERENCES users(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS chat_messages (
+            id TEXT PRIMARY KEY,
+            chat_id TEXT,
+            role TEXT,
+            content TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(chat_id) REFERENCES chats(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS project_applications (
+            id TEXT PRIMARY KEY,
+            project_id TEXT,
+            user_id TEXT,
+            user_name TEXT,
+            user_avatar TEXT,
+            student_id TEXT,
+            phone_number TEXT,
+            description TEXT,
+            status TEXT DEFAULT 'Pending', -- Pending, Accepted, Rejected
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(project_id) REFERENCES projects(id),
+            FOREIGN KEY(user_id) REFERENCES users(id)
+        );
     `);
+
+    // Migration for existing resources table to add text_content if missing
+    // Migration for existing resources table to add text_content if missing
+    try {
+        await db.exec('ALTER TABLE resources ADD COLUMN text_content TEXT');
+    } catch (e) {
+        // Ignore error if column already exists
+    }
+
+    // Migration for source column
+    try {
+        await db.exec(`ALTER TABLE resources ADD COLUMN source TEXT DEFAULT 'library'`);
+    } catch (e) {
+        // Ignore error if column already exists
+    }
+
+    // Migration for projects columns
+    try {
+        await db.exec(`ALTER TABLE projects ADD COLUMN looking_for TEXT`);
+    } catch (e) { }
+    try {
+        await db.exec(`ALTER TABLE projects ADD COLUMN members_needed INTEGER DEFAULT 1`);
+    } catch (e) { }
+
     console.log('Tables created or verified.');
 
     // Seed Data Check
