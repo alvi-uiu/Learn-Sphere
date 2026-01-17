@@ -62,6 +62,15 @@ export const initDb = async () => {
             FOREIGN KEY(parent_id) REFERENCES comments(id)
         );
 
+        CREATE TABLE IF NOT EXISTS post_likes (
+            post_id TEXT,
+            user_id TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (post_id, user_id),
+            FOREIGN KEY(post_id) REFERENCES posts(id),
+            FOREIGN KEY(user_id) REFERENCES users(id)
+        );
+
         CREATE TABLE IF NOT EXISTS notes (
             id TEXT PRIMARY KEY,
             user_id TEXT,
@@ -181,6 +190,25 @@ export const initDb = async () => {
             FOREIGN KEY(project_id) REFERENCES projects(id),
             FOREIGN KEY(user_id) REFERENCES users(id)
         );
+
+        CREATE TABLE IF NOT EXISTS notifications (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            type TEXT NOT NULL, -- 'like', 'comment', 'project_accepted'
+            title TEXT NOT NULL,
+            message TEXT NOT NULL,
+            post_id TEXT,
+            project_id TEXT,
+            actor_id TEXT,
+            actor_name TEXT,
+            actor_avatar TEXT,
+            read INTEGER DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(user_id) REFERENCES users(id),
+            FOREIGN KEY(post_id) REFERENCES posts(id),
+            FOREIGN KEY(project_id) REFERENCES projects(id),
+            FOREIGN KEY(actor_id) REFERENCES users(id)
+        );
     `);
 
     // Migration for existing resources table to add text_content if missing
@@ -206,6 +234,17 @@ export const initDb = async () => {
         await db.exec(`ALTER TABLE projects ADD COLUMN members_needed INTEGER DEFAULT 1`);
     } catch (e) { }
 
+    // Migration for users visibility columns
+    try {
+        await db.exec(`ALTER TABLE users ADD COLUMN isIdVisible INTEGER DEFAULT 0`);
+    } catch (e) { }
+    try {
+        await db.exec(`ALTER TABLE users ADD COLUMN isEmailVisible INTEGER DEFAULT 0`);
+    } catch (e) { }
+    try {
+        await db.exec(`ALTER TABLE users ADD COLUMN student_id TEXT`);
+    } catch (e) { }
+
     console.log('Tables created or verified.');
 
     // Seed Data Check
@@ -214,7 +253,7 @@ export const initDb = async () => {
         console.log('Seeding database...');
         // Seed Users
         await db.run(`INSERT INTO users (id, email, password, name, avatar, role, major, level, xp) VALUES 
-            ('u_sys', 'admin@learnsphere.edu', 'admin123', 'System Admin', 'https://ui-avatars.com/api/?name=System+Admin&background=0D8ABC&color=fff', 'Administrator', 'IT Dept', 99, 99999),
+            ('u_sys', 'admin@learnsphere.edu', 'admin123', 'System Admin', 'https://ui-avatars.com/api/?name=System+Admin&background=0D8ABC&color=fff', 'admin', 'IT Dept', 99, 99999),
             ('u_alex', 'alex@university.edu', 'password123', 'Alex Johnson', 'https://picsum.photos/seed/user1/40/40', 'Student', 'Computer Science', 12, 2450),
             ('u_sarah', 'sarah@university.edu', 'password123', 'Sarah Chen', 'https://picsum.photos/seed/sarah/40/40', 'Researcher', 'Physics', 15, 3200)`);
 

@@ -73,7 +73,44 @@ const mapPost = (p: any, savedIds: Set<string> = new Set()) => ({
     timestamp: p.created_at,
     sessionData: p.session_data ? JSON.parse(p.session_data) : undefined,
     attachments: p.attachments ? JSON.parse(p.attachments) : [],
-    isSaved: savedIds.has(p.id)
+    isSaved: savedIds.has(p.id),
+    authorStudentId: p.authorStudentId,
+    authorEmail: p.authorEmail,
+    authorIsIdVisible: p.authorIsIdVisible,
+    authorIsEmailVisible: p.authorIsEmailVisible
+});
+
+// USER API
+app.get('/api/users/:id', async (req, res) => {
+    const db = getDb();
+    const { id } = req.params;
+    const user = await db.get('SELECT * FROM users WHERE id = ?', id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    const { password, ...safeUser } = user;
+
+    // Map SQLite 0/1 to boolean and snake_case to camelCase
+    res.json({
+        ...safeUser,
+        studentId: safeUser.student_id,
+        isIdVisible: !!safeUser.isIdVisible,
+        isEmailVisible: !!safeUser.isEmailVisible
+    });
+});
+
+app.put('/api/users/:id', async (req, res) => {
+    const db = getDb();
+    const { id } = req.params;
+    const { name, avatar, role, major, studentId, isIdVisible, isEmailVisible } = req.body;
+    try {
+        await db.run(
+            'UPDATE users SET name = ?, avatar = ?, role = ?, major = ?, student_id = ?, isIdVisible = ?, isEmailVisible = ? WHERE id = ?',
+            [name, avatar, role, major, studentId, isIdVisible ? 1 : 0, isEmailVisible ? 1 : 0, id]
+        );
+        res.json({ success: true });
+    } catch (e) {
+        console.error('Update user error:', e);
+        res.status(500).json({ error: (e as Error).message });
+    }
 });
 
 // POSTS API
@@ -81,7 +118,27 @@ app.get('/api/posts', async (req, res) => {
     const db = getDb();
     const userId = req.query.userId as string; // Check if user calls to see 'saved' status
 
-    const posts = await db.all('SELECT * FROM posts ORDER BY created_at DESC');
+    // Join with users table to get latest author info and visibility settings
+    const posts = await db.all(`
+        SELECT p.*, 
+               u.name as current_author_name, 
+               u.avatar as current_author_avatar,
+               u.student_id as author_student_id,
+               u.email as author_email,
+               u.isIdVisible as author_is_id_visible,
+               u.isEmailVisible as author_is_email_visible
+        FROM posts p
+        LEFT JOIN users u ON p.user_id = u.id
+        ORDER BY p.created_at DESC
+    `);
+
+    // Fetch Likes
+    const likes = await db.all('SELECT post_id, user_id FROM post_likes');
+    const likesMap = new Map<string, string[]>();
+    likes.forEach(l => {
+        if (!likesMap.has(l.post_id)) likesMap.set(l.post_id, []);
+        likesMap.get(l.post_id)?.push(l.user_id);
+    });
 
     let savedIds = new Set<string>();
     if (userId) {
@@ -89,7 +146,19 @@ app.get('/api/posts', async (req, res) => {
         saved.forEach(s => savedIds.add(s.post_id));
     }
 
-    res.json(posts.map(p => mapPost(p, savedIds)));
+    res.json(posts.map(p => ({
+        ...mapPost({
+            ...p,
+            // Override with latest user data if available via join
+            author_name: p.current_author_name || p.author_name,
+            author_avatar: p.current_author_avatar || p.author_avatar,
+            authorStudentId: p.author_student_id,
+            authorEmail: p.author_email,
+            authorIsIdVisible: !!p.author_is_id_visible,
+            authorIsEmailVisible: !!p.author_is_email_visible
+        }, savedIds),
+        likedBy: likesMap.get(p.id) || []
+    })));
 });
 
 app.post('/api/posts', async (req, res) => {
@@ -137,9 +206,62 @@ app.delete('/api/posts/:id', async (req, res) => {
 app.post('/api/posts/:id/like', async (req, res) => {
     const db = getDb();
     const { id } = req.params;
-    await db.run('UPDATE posts SET likes = likes + 1 WHERE id = ?', id);
-    const updated = await db.all('SELECT * FROM posts ORDER BY created_at DESC');
-    res.json(updated.map(p => mapPost(p)));
+    const { userId } = req.body;
+
+    if (!userId) return res.status(400).json({ error: 'User ID required' });
+
+    try {
+        // Check if already liked
+        const existing = await db.get('SELECT * FROM post_likes WHERE post_id = ? AND user_id = ?', [id, userId]);
+
+        // Get post details for notification
+        const post = await db.get('SELECT user_id, author_name FROM posts WHERE id = ?', id);
+        const user = await db.get('SELECT name, avatar FROM users WHERE id = ?', userId);
+
+        if (existing) {
+            // Unlike
+            await db.run('DELETE FROM post_likes WHERE post_id = ? AND user_id = ?', [id, userId]);
+            await db.run('UPDATE posts SET likes = MAX(0, likes - 1) WHERE id = ?', id);
+        } else {
+            // Like
+            await db.run('INSERT INTO post_likes (post_id, user_id) VALUES (?, ?)', [id, userId]);
+            await db.run('UPDATE posts SET likes = likes + 1 WHERE id = ?', id);
+
+            // Create notification if not liking own post
+            if (post && post.user_id !== userId) {
+                await createNotification({
+                    userId: post.user_id,
+                    type: 'like',
+                    title: 'New Like',
+                    message: `${user.name} liked your post`,
+                    postId: id,
+                    actorId: userId,
+                    actorName: user.name,
+                    actorAvatar: user.avatar
+                });
+            }
+        }
+
+        // Get updated post with likedBy
+        const posts = await db.all('SELECT * FROM posts ORDER BY created_at DESC');
+
+        // Fetch likedBy for all posts (efficiently?) or just map properly
+        const likes = await db.all('SELECT post_id, user_id FROM post_likes');
+        const likesMap = new Map<string, string[]>();
+        likes.forEach(l => {
+            if (!likesMap.has(l.post_id)) likesMap.set(l.post_id, []);
+            likesMap.get(l.post_id)?.push(l.user_id);
+        });
+
+        const mappedPosts = posts.map(p => ({
+            ...mapPost(p),
+            likedBy: likesMap.get(p.id) || []
+        }));
+
+        res.json(mappedPosts);
+    } catch (e) {
+        res.status(500).json({ error: (e as Error).message });
+    }
 });
 
 app.post('/api/posts/:id/save', async (req, res) => {
@@ -205,6 +327,40 @@ app.post('/api/posts/:id/comments', async (req, res) => {
         // Update comment count on post (optional for performance, but good for UI)
         await db.run('UPDATE posts SET comments = comments + 1 WHERE id = ?', postId);
 
+        // Get post details for notification
+        const post = await db.get('SELECT user_id FROM posts WHERE id = ?', postId);
+
+        // Create notification for post author (if not commenting on own post)
+        if (post && post.user_id !== userId) {
+            await createNotification({
+                userId: post.user_id,
+                type: 'comment',
+                title: 'New Comment',
+                message: `${userName} commented on your post`,
+                postId: postId,
+                actorId: userId,
+                actorName: userName,
+                actorAvatar: userAvatar
+            });
+        }
+
+        // If it's a reply, also notify the parent comment author
+        if (parentId) {
+            const parentComment = await db.get('SELECT user_id, user_name FROM comments WHERE id = ?', parentId);
+            if (parentComment && parentComment.user_id !== userId) {
+                await createNotification({
+                    userId: parentComment.user_id,
+                    type: 'comment',
+                    title: 'New Reply',
+                    message: `${userName} replied to your comment`,
+                    postId: postId,
+                    actorId: userId,
+                    actorName: userName,
+                    actorAvatar: userAvatar
+                });
+            }
+        }
+
         const newComments = await db.all('SELECT * FROM comments WHERE post_id = ? ORDER BY created_at ASC', postId);
         res.json(newComments);
     } catch (e) {
@@ -229,7 +385,12 @@ app.post('/api/auth/login', async (req, res) => {
         if (user) {
             // Remove password from response
             const { password, ...safeUser } = user;
-            res.json(safeUser);
+            res.json({
+                ...safeUser,
+                studentId: safeUser.student_id,
+                isIdVisible: !!safeUser.isIdVisible,
+                isEmailVisible: !!safeUser.isEmailVisible
+            });
         } else {
             res.status(401).json({ error: 'Invalid credentials' });
         }
@@ -257,7 +418,12 @@ app.post('/api/auth/register', async (req, res) => {
 
         const user = await db.get('SELECT * FROM users WHERE id = ?', id);
         const { password: _, ...safeUser } = user;
-        res.json(safeUser);
+        res.json({
+            ...safeUser,
+            studentId: safeUser.student_id,
+            isIdVisible: !!safeUser.isIdVisible,
+            isEmailVisible: !!safeUser.isEmailVisible
+        });
     } catch (e) {
         res.status(500).json({ error: (e as Error).message });
     }
@@ -833,10 +999,24 @@ app.put('/api/projects/:id/applications/:appId', async (req, res) => {
 
         if (status === 'Accepted') {
             const app = await db.get('SELECT * FROM project_applications WHERE id = ?', appId);
+            const project = await db.get('SELECT title, owner_name, owner_avatar, owner_id FROM projects WHERE id = ?', projectId);
+
             await db.run(
                 'INSERT OR IGNORE INTO project_members (project_id, user_id, user_name, user_avatar, student_id, role) VALUES (?, ?, ?, ?, ?, ?)',
                 [projectId, app.user_id, app.user_name, app.user_avatar, app.student_id, 'Contributor']
             );
+
+            // Create notification for applicant
+            await createNotification({
+                userId: app.user_id,
+                type: 'project_accepted',
+                title: 'Application Accepted!',
+                message: `Your application for "${project.title}" has been accepted`,
+                projectId: projectId,
+                actorId: project.owner_id,
+                actorName: project.owner_name,
+                actorAvatar: project.owner_avatar
+            });
         }
         res.json({ success: true });
     } catch (e) {
@@ -884,22 +1064,252 @@ app.delete('/api/projects/:projectId/tasks/:taskId', async (req, res) => {
     }
 });
 
-// UPDATES
-app.post('/api/projects/:id/updates', async (req, res) => {
+// ADMIN API
+app.get('/api/admin/stats', async (req, res) => {
     const db = getDb();
-    const { id: projectId } = req.params;
-    const { userId, userName, userAvatar, content } = req.body;
-    const id = uuidv4();
     try {
-        await db.run(
-            `INSERT INTO project_updates (id, project_id, user_id, user_name, user_avatar, content) VALUES (?, ?, ?, ?, ?, ?)`,
-            [id, projectId, userId, userName, userAvatar, content]
-        );
-        res.json({ success: true, id });
+        const userCount = await db.get('SELECT count(*) as count FROM users');
+        const postCount = await db.get('SELECT count(*) as count FROM posts');
+        const projectCount = await db.get('SELECT count(*) as count FROM projects');
+        const resourceCount = await db.get('SELECT count(*) as count FROM resources');
+
+        const recentUsers = await db.all('SELECT id, name, email, avatar, role FROM users ORDER BY id DESC LIMIT 5');
+        const recentPosts = await db.all('SELECT p.*, u.name as author_name FROM posts p LEFT JOIN users u ON p.user_id = u.id ORDER BY created_at DESC LIMIT 5');
+        const recentProjects = await db.all('SELECT * FROM projects ORDER BY created_at DESC LIMIT 5');
+
+        const isGeminiActive = !!(process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY);
+
+        res.json({
+            users: userCount.count,
+            posts: postCount.count,
+            projects: projectCount.count,
+            resources: resourceCount.count,
+            recent: {
+                users: recentUsers,
+                posts: recentPosts,
+                projects: recentProjects
+            },
+            system: {
+                uptime: process.uptime(),
+                gemini: isGeminiActive ? 'Active' : 'Inactive',
+                nodeVersion: process.version,
+                platform: process.platform
+            }
+        });
     } catch (e) {
         res.status(500).json({ error: (e as Error).message });
     }
 });
+
+app.get('/api/admin/users', async (req, res) => {
+    const db = getDb();
+    try {
+        const users = await db.all(`
+            SELECT u.*, 
+            (SELECT count(*) FROM posts WHERE user_id = u.id) as post_count,
+            (SELECT count(*) FROM projects WHERE owner_id = u.id) as project_count
+            FROM users u
+        `);
+        res.json(users);
+    } catch (e) {
+        res.status(500).json({ error: (e as Error).message });
+    }
+});
+
+app.put('/api/admin/users/:id', async (req, res) => {
+    const db = getDb();
+    const { id } = req.params;
+    const { name, email, role, major, avatar } = req.body;
+    console.log(`Updating user ${id}:`, { name, email, role, major });
+    try {
+        await db.run(
+            'UPDATE users SET name = ?, email = ?, role = ?, major = ?, avatar = ? WHERE id = ?',
+            [name, email, role, major, avatar, id]
+        );
+        res.json({ success: true });
+    } catch (e) {
+        console.error('Update user error:', e);
+        res.status(500).json({ error: (e as Error).message });
+    }
+});
+
+app.delete('/api/admin/users/:id', async (req, res) => {
+    const db = getDb();
+    const { id } = req.params;
+    try {
+        await db.run('DELETE FROM users WHERE id = ?', id);
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: (e as Error).message });
+    }
+});
+
+app.get('/api/admin/posts', async (req, res) => {
+    const db = getDb();
+    try {
+        const posts = await db.all(`
+            SELECT p.*, 
+            COALESCE(u.name, p.author_name) as author_name, 
+            COALESCE(u.avatar, p.author_avatar) as author_avatar,
+            u.email as author_email
+            FROM posts p
+            LEFT JOIN users u ON p.user_id = u.id
+            ORDER BY p.created_at DESC
+        `);
+        res.json(posts);
+    } catch (e) {
+        res.status(500).json({ error: (e as Error).message });
+    }
+});
+
+app.delete('/api/admin/posts/:id', async (req, res) => {
+    const db = getDb();
+    const { id } = req.params;
+    try {
+        await db.run('DELETE FROM posts WHERE id = ?', id);
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: (e as Error).message });
+    }
+});
+
+app.get('/api/admin/resources', async (req, res) => {
+    const db = getDb();
+    try {
+        const resources = await db.all('SELECT * FROM resources ORDER BY created_at DESC');
+        res.json(resources);
+    } catch (e) {
+        res.status(500).json({ error: (e as Error).message });
+    }
+});
+
+app.delete('/api/admin/resources/:id', async (req, res) => {
+    const db = getDb();
+    const { id } = req.params;
+    try {
+        await db.run('DELETE FROM resources WHERE id = ?', id);
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: (e as Error).message });
+    }
+});
+
+app.get('/api/admin/projects', async (req, res) => {
+    const db = getDb();
+    try {
+        const projects = await db.all('SELECT * FROM projects ORDER BY created_at DESC');
+        res.json(projects);
+    } catch (e) {
+        res.status(500).json({ error: (e as Error).message });
+    }
+});
+
+app.delete('/api/admin/projects/:id', async (req, res) => {
+    const db = getDb();
+    const { id } = req.params;
+    try {
+        // Also delete members, tasks, and updates to be clean
+        await db.run('DELETE FROM projects WHERE id = ?', id);
+        await db.run('DELETE FROM project_members WHERE project_id = ?', id);
+        await db.run('DELETE FROM project_tasks WHERE project_id = ?', id);
+        await db.run('DELETE FROM project_updates WHERE project_id = ?', id);
+        await db.run('DELETE FROM project_applications WHERE project_id = ?', id);
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: (e as Error).message });
+    }
+});
+
+// NOTIFICATIONS API
+app.get('/api/notifications', async (req, res) => {
+    const db = getDb();
+    const { userId } = req.query;
+
+    if (!userId) return res.status(400).json({ error: 'User ID required' });
+
+    try {
+        const notifications = await db.all(
+            'SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC',
+            userId
+        );
+        res.json(notifications);
+    } catch (e) {
+        res.status(500).json({ error: (e as Error).message });
+    }
+});
+
+app.post('/api/notifications/mark-read', async (req, res) => {
+    const db = getDb();
+    const { notificationId } = req.body;
+
+    try {
+        await db.run('UPDATE notifications SET read = 1 WHERE id = ?', notificationId);
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: (e as Error).message });
+    }
+});
+
+app.post('/api/notifications/mark-all-read', async (req, res) => {
+    const db = getDb();
+    const { userId } = req.body;
+
+    try {
+        await db.run('UPDATE notifications SET read = 1 WHERE user_id = ?', userId);
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: (e as Error).message });
+    }
+});
+
+app.delete('/api/notifications/:id', async (req, res) => {
+    const db = getDb();
+    const { id } = req.params;
+
+    try {
+        await db.run('DELETE FROM notifications WHERE id = ?', id);
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: (e as Error).message });
+    }
+});
+
+// Helper function to create notifications
+async function createNotification(params: {
+    userId: string;
+    type: 'like' | 'comment' | 'project_accepted';
+    title: string;
+    message: string;
+    postId?: string;
+    projectId?: string;
+    actorId: string;
+    actorName: string;
+    actorAvatar: string;
+}) {
+    const db = getDb();
+    const id = uuidv4();
+
+    try {
+        await db.run(
+            `INSERT INTO notifications (id, user_id, type, title, message, post_id, project_id, actor_id, actor_name, actor_avatar) 
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+                id,
+                params.userId,
+                params.type,
+                params.title,
+                params.message,
+                params.postId || null,
+                params.projectId || null,
+                params.actorId,
+                params.actorName,
+                params.actorAvatar
+            ]
+        );
+    } catch (e) {
+        console.error('Error creating notification:', e);
+    }
+}
 
 // INIT
 initDb().then(() => {

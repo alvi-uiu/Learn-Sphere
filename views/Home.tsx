@@ -37,9 +37,10 @@ interface UpcomingSession {
 
 interface HomeViewProps {
   user: any;
+  onViewProfile?: (userId: string) => void;
 }
 
-export const HomeView: React.FC<HomeViewProps> = ({ user }) => {
+export const HomeView: React.FC<HomeViewProps> = ({ user, onViewProfile }) => {
   const { showToast } = useToast();
   const { theme } = useTheme();
   const isDark = theme === 'dark';
@@ -49,7 +50,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ user }) => {
   const [currentUser, setCurrentUser] = useState<any>(user || {});
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [filter, setFilter] = useState('All');
-  const FILTERS = ['All', 'Academic', 'Motivational', 'Tips', 'Session', 'Saved'];
+  const FILTERS = ['Academic', 'Motivational', 'Tips', 'Session'];
 
   // Daily Goals State
   const [dailyGoals, setDailyGoals] = useState<DailyGoal[]>(() => {
@@ -87,7 +88,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ user }) => {
   useEffect(() => {
     if (posts.length > 0) {
       const categoryStats: Record<string, { likes: number; comments: number; count: number }> = {};
-      
+
       posts.forEach(post => {
         const cat = post.category || 'General';
         if (!categoryStats[cat]) {
@@ -131,15 +132,20 @@ export const HomeView: React.FC<HomeViewProps> = ({ user }) => {
       const res = await fetch(`http://localhost:3001/api/posts?userId=${user.id || ''}`);
       const allPosts = await res.json();
       const sessions = allPosts
-        .filter((p: any) => p.sessionData)
-        .map((p: any) => ({
-          id: p.id,
-          title: p.sessionData.course_name || 'Study Session',
-          date: p.sessionData.start_time?.split(' ')[0] || 'TBD',
-          time: p.sessionData.start_time || 'TBD',
-          participants: ['You'],
-          meetingLink: p.sessionData.meeting_link
-        }))
+        .filter((p: any) => p.sessionData && p.sessionData.start_time)
+        .sort((a: any, b: any) => new Date(a.sessionData.start_time).getTime() - new Date(b.sessionData.start_time).getTime())
+        .map((p: any) => {
+          const dateObj = new Date(p.sessionData.start_time);
+          const isValid = !isNaN(dateObj.getTime());
+          return {
+            id: p.id,
+            title: p.sessionData.course_name || 'Study Session',
+            date: isValid ? dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Date TBD',
+            time: isValid ? dateObj.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : 'Time TBD',
+            participants: [],
+            meetingLink: p.sessionData.meeting_link
+          };
+        })
         .slice(0, 5);
       setUpcomingSessions(sessions);
     } catch (e) {
@@ -149,7 +155,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ user }) => {
 
   // Daily Goal handlers
   const toggleGoalComplete = (goalId: string) => {
-    setDailyGoals(prev => prev.map(g => 
+    setDailyGoals(prev => prev.map(g =>
       g.id === goalId ? { ...g, completed: !g.completed } : g
     ));
     showToast('Goal updated!', 'success');
@@ -224,30 +230,16 @@ export const HomeView: React.FC<HomeViewProps> = ({ user }) => {
           </div>
 
           <div className={`mt-8 pt-8 border-t ${isDark ? 'border-white/5' : 'border-gray-200'} space-y-3`}>
-            <div className={`flex items-center justify-between text-xs p-2 rounded-xl cursor-pointer group ${filter === 'All' ? (isDark ? 'bg-white/10 text-white' : 'bg-apple-blue/10 text-apple-blue font-bold') : (isDark ? 'hover:bg-white/5 text-gray-400' : 'hover:bg-gray-100 text-gray-600')}`} onClick={() => setFilter('All')}>
+            <div className={`flex items-center justify-between text-xs p-2 rounded-xl cursor-pointer group font-bold ${filter === 'All' ? (isDark ? 'bg-white/10 text-white' : 'bg-apple-blue/10 text-apple-blue') : (isDark ? 'hover:bg-white/5 text-gray-400' : 'hover:bg-gray-100 text-gray-600')}`} onClick={() => setFilter('All')}>
               <div className="flex items-center gap-2"><Layout size={14} /> <span>All Posts</span></div>
             </div>
-            <div className={`flex items-center justify-between text-xs p-2 rounded-xl cursor-pointer group ${filter === 'Session' ? (isDark ? 'bg-white/10 text-white' : 'bg-apple-blue/10 text-apple-blue font-bold') : (isDark ? 'hover:bg-white/5 text-gray-400' : 'hover:bg-gray-100 text-gray-600')}`} onClick={() => setFilter('Session')}>
-              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-indigo-500"></div> <span>Sessions</span></div>
-            </div>
-            <div className={`flex items-center justify-between text-xs p-2 rounded-xl cursor-pointer group ${filter === 'Saved' ? (isDark ? 'bg-white/10 text-white' : 'bg-apple-blue/10 text-apple-blue font-bold') : (isDark ? 'hover:bg-white/5 text-gray-400' : 'hover:bg-gray-100 text-gray-600')}`} onClick={() => setFilter('Saved')}>
+
+            <div className={`flex items-center justify-between text-xs p-2 rounded-xl cursor-pointer group font-bold ${filter === 'Saved' ? (isDark ? 'bg-white/10 text-white' : 'bg-apple-blue/10 text-apple-blue') : (isDark ? 'hover:bg-white/5 text-gray-400' : 'hover:bg-gray-100 text-gray-600')}`} onClick={() => setFilter('Saved')}>
               <div className="flex items-center gap-2">
                 <Bookmark size={14} /> <span>Saved Resources</span>
               </div>
               <span className={`px-1.5 py-0.5 rounded text-[10px] ${isDark ? 'bg-white/10' : 'bg-gray-200'}`}>{posts.filter(p => p.isSaved).length}</span>
             </div>
-          </div>
-
-          <div className={`mt-4 pt-4 border-t ${isDark ? 'border-white/5' : 'border-gray-200'}`}>
-            <button
-              onClick={() => {
-                localStorage.removeItem('user');
-                window.location.reload();
-              }}
-              className="w-full py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-xl text-xs font-bold transition-all"
-            >
-              Logout
-            </button>
           </div>
         </GlassCard>
 
@@ -280,7 +272,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ user }) => {
               </span>
             </div>
             <div className={`w-full h-2 rounded-full overflow-hidden ${isDark ? 'bg-white/5' : 'bg-gray-200'}`}>
-              <div 
+              <div
                 className="h-full apple-gradient transition-all duration-500"
                 style={{ width: `${dailyGoals.length > 0 ? (dailyGoals.filter(g => g.completed).length / dailyGoals.length) * 100 : 0}%` }}
               ></div>
@@ -289,8 +281,8 @@ export const HomeView: React.FC<HomeViewProps> = ({ user }) => {
 
           <div className="space-y-3 max-h-48 overflow-y-auto">
             {dailyGoals.map(goal => (
-              <div 
-                key={goal.id} 
+              <div
+                key={goal.id}
                 className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-all ${goal.completed ? 'bg-green-500/10' : (isDark ? 'hover:bg-white/5' : 'hover:bg-gray-100')}`}
                 onClick={() => toggleGoalComplete(goal.id)}
               >
@@ -302,7 +294,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ user }) => {
                 </div>
                 <button
                   onClick={(e) => { e.stopPropagation(); deleteGoal(goal.id); }}
-                  className="p-1 text-gray-400 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
+                  className="p-1 text-gray-400 hover:text-red-500 transition-colors"
                 >
                   <X size={12} />
                 </button>
@@ -318,9 +310,8 @@ export const HomeView: React.FC<HomeViewProps> = ({ user }) => {
                   onChange={(e) => setNewGoalTitle(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && addGoal()}
                   placeholder="New goal..."
-                  className={`flex-1 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-apple-blue ${
-                    isDark ? 'bg-white/5 border border-white/10 text-white' : 'bg-gray-100 border border-gray-200 text-gray-900'
-                  }`}
+                  className={`flex-1 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-apple-blue ${isDark ? 'bg-white/5 border border-white/10 text-white' : 'bg-gray-100 border border-gray-200 text-gray-900'
+                    }`}
                   autoFocus
                 />
                 <button onClick={addGoal} className="px-3 py-2 bg-apple-blue text-white rounded-lg text-xs font-bold">Add</button>
@@ -331,20 +322,19 @@ export const HomeView: React.FC<HomeViewProps> = ({ user }) => {
             )}
           </div>
         </GlassCard>
-      </div>
+      </div >
 
       {/* Main Feed */}
-      <div className="lg:col-span-6 space-y-6">
+      < div className="lg:col-span-6 space-y-6" >
 
         {/* Create Post Action */}
-        <GlassCard className="p-5 border-apple-blue/20">
+        < GlassCard className="p-5 border-apple-blue/20" >
           <div className="flex gap-4">
             <img src={currentUser.avatar || "https://picsum.photos/seed/user1/40/40"} className="w-10 h-10 rounded-2xl" alt="Me" />
             <div
               onClick={() => setIsCreateModalOpen(true)}
-              className={`flex-1 rounded-xl p-3 text-sm text-gray-500 cursor-text transition-colors ${
-                isDark ? 'bg-white/5 hover:bg-white/10' : 'bg-gray-100 hover:bg-gray-200'
-              }`}
+              className={`flex-1 rounded-xl p-3 text-sm text-gray-500 cursor-text transition-colors ${isDark ? 'bg-white/5 hover:bg-white/10' : 'bg-gray-100 hover:bg-gray-200'
+                }`}
             >
               What's on your mind, {currentUser.name?.split(' ')[0] || 'Student'}?
             </div>
@@ -367,44 +357,49 @@ export const HomeView: React.FC<HomeViewProps> = ({ user }) => {
               Create Post
             </button>
           </div>
-        </GlassCard>
+        </GlassCard >
 
         {/* Feed Sort / Filters */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide">
-          {FILTERS.map(f => (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all ${filter === f
-                ? 'bg-apple-blue text-white'
-                : isDark 
-                  ? 'bg-white/5 text-gray-400 border border-white/10 hover:bg-white/10 hover:text-white'
-                  : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-100 hover:text-gray-900'
-                }`}
-            >
-              {f}
-            </button>
-          ))}
-        </div>
+        < div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide" >
+          {
+            FILTERS.map(f => (
+              <button
+                key={f}
+                onClick={() => setFilter(f)}
+                className={`px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all ${filter === f
+                  ? 'bg-apple-blue text-white'
+                  : isDark
+                    ? 'bg-white/5 text-gray-400 border border-white/10 hover:bg-white/10 hover:text-white'
+                    : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-100 hover:text-gray-900'
+                  }`}
+              >
+                {f}
+              </button>
+            ))
+          }
+        </div >
 
         {/* Posts */}
-        <div className="space-y-6">
-          {displayedPosts.length > 0 ? displayedPosts.map(post => (
-            <PostCard
-              key={post.id}
-              post={post}
-              currentUser={currentUser}
-              onUpdate={handlePostUpdate}
-              onDelete={handlePostDelete}
-            />
-          )) : (
-            <div className="text-center py-10 opacity-50">
-              <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>No posts found for "{filter}"</p>
-            </div>
-          )}
-        </div>
+        < div className="space-y-6" >
+          {
+            displayedPosts.length > 0 ? displayedPosts.map(post => (
+              <PostCard
+                key={post.id}
+                post={post}
+                currentUser={currentUser}
+                onUpdate={handlePostUpdate}
+                onDelete={handlePostDelete}
+                onUserClick={onViewProfile}
+              />
+            )) : (
+              <div className="text-center py-10 opacity-50">
+                <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>No posts found for "{filter}"</p>
+              </div>
+            )
+          }
+        </div >
 
-      </div>
+      </div >
 
       <CreatePostModal
         isOpen={isCreateModalOpen}
@@ -442,35 +437,32 @@ export const HomeView: React.FC<HomeViewProps> = ({ user }) => {
             <h4 className={`font-bold text-sm ${isDark ? 'text-white' : 'text-gray-900'}`}>Upcoming Sessions</h4>
             <Calendar size={16} className="text-indigo-400" />
           </div>
-          
+
           {upcomingSessions.length > 0 ? (
             <div className="relative">
               {/* Session Card */}
-              <div className={`p-4 rounded-2xl border hover:shadow-lg transition-all ${
-                isDark ? 'bg-white/5 border-white/5' : 'bg-white border-gray-200'
-              }`}>
-                <p className="text-[10px] text-indigo-500 font-bold uppercase mb-2">
-                  {upcomingSessions[currentSessionIndex]?.date} • {upcomingSessions[currentSessionIndex]?.time}
-                </p>
-                <h5 className={`text-sm font-bold mb-3 ${isDark ? 'text-white' : 'text-gray-900'}`}>{upcomingSessions[currentSessionIndex]?.title}</h5>
-                <div className="flex items-center justify-between">
-                  <div className="flex -space-x-2">
-                    {[1, 2, 3].map(i => (
-                      <img 
-                        key={i} 
-                        src={`https://picsum.photos/seed/${i + currentSessionIndex * 10}/30/30`} 
-                        className={`w-6 h-6 rounded-full border-2 ${isDark ? 'border-black' : 'border-white'}`} 
-                        alt="Participant"
-                      />
-                    ))}
+              {/* Session Card */}
+              <div className={`p-5 rounded-2xl border transition-all ${isDark ? 'bg-white/5 border-white/5' : 'bg-white border-gray-200'}`}>
+                <div className="flex flex-col gap-3">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest mb-1">
+                        {upcomingSessions[currentSessionIndex]?.date}
+                      </p>
+                      <h5 className={`text-base font-bold leading-tight ${isDark ? 'text-white' : 'text-gray-900'}`}>{upcomingSessions[currentSessionIndex]?.title}</h5>
+                    </div>
+                    <span className={`text-[10px] font-mono py-1 px-2 rounded-lg ${isDark ? 'bg-indigo-500/10 text-indigo-400' : 'bg-indigo-50 text-indigo-600'}`}>
+                      {upcomingSessions[currentSessionIndex]?.time}
+                    </span>
                   </div>
+
                   {upcomingSessions[currentSessionIndex]?.meetingLink && (
                     <a
                       href={upcomingSessions[currentSessionIndex].meetingLink}
                       target="_blank"
-                      className="px-3 py-1.5 bg-indigo-500/10 text-indigo-500 rounded-lg text-xs font-bold hover:bg-indigo-500/20 transition-colors"
+                      className="mt-2 flex items-center justify-center gap-2 w-full py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-500/25"
                     >
-                      Join
+                      Join Session
                     </a>
                   )}
                 </div>
@@ -487,7 +479,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ user }) => {
                   </button>
                   <div className="flex gap-1">
                     {upcomingSessions.map((_, i) => (
-                      <div 
+                      <div
                         key={i}
                         className={`w-2 h-2 rounded-full transition-all ${i === currentSessionIndex ? 'bg-indigo-500 w-4' : (isDark ? 'bg-white/20' : 'bg-gray-300')}`}
                       />
@@ -506,7 +498,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ user }) => {
             <div className="text-center py-6">
               <Calendar size={32} className={`mx-auto mb-2 ${isDark ? 'text-gray-600' : 'text-gray-300'}`} />
               <p className="text-xs text-gray-500">No upcoming sessions</p>
-              <button 
+              <button
                 onClick={() => setIsCreateModalOpen(true)}
                 className="mt-3 px-4 py-2 bg-indigo-500/10 text-indigo-500 rounded-xl text-xs font-bold hover:bg-indigo-500/20 transition-colors"
               >
@@ -526,6 +518,6 @@ export const HomeView: React.FC<HomeViewProps> = ({ user }) => {
         </div>
       </div>
 
-    </div>
+    </div >
   );
 };

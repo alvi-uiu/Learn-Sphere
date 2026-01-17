@@ -22,6 +22,9 @@ export interface User {
   major?: string;
   bio?: string;
   xp: number;
+  studentId?: string;
+  isIdVisible?: boolean;
+  isEmailVisible?: boolean;
 }
 
 export interface SessionData {
@@ -53,6 +56,11 @@ export interface Post {
   sessionData?: SessionData;
   attachments?: Attachment[];
   isSaved?: boolean;
+  authorStudentId?: string;
+  authorEmail?: string;
+  authorIsIdVisible?: boolean;
+  authorIsEmailVisible?: boolean;
+  likedBy?: string[];
 }
 
 export interface Project {

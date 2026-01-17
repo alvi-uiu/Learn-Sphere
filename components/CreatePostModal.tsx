@@ -96,7 +96,11 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({ isOpen, onClos
                 content,
                 category,
                 sessionData: finalSessionData,
-                attachments: processedAttachments
+                attachments: processedAttachments,
+                authorStudentId: user?.studentId,
+                authorEmail: user?.email,
+                authorIsIdVisible: user?.isIdVisible,
+                authorIsEmailVisible: user?.isEmailVisible
             } as any);
 
             showToast('Post created successfully!', 'success');
@@ -113,9 +117,8 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({ isOpen, onClos
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
             <div className="absolute inset-0" onClick={onClose}></div>
-            <GlassCard className={`w-full max-w-xl relative shadow-2xl animate-in zoom-in-95 duration-200 p-0 overflow-hidden ${
-                isDark ? 'border-white/10' : 'bg-white border border-gray-200'
-            }`}>
+            <GlassCard className={`w-full max-w-xl relative shadow-2xl animate-in zoom-in-95 duration-200 p-0 overflow-hidden ${isDark ? 'border-white/10' : 'bg-white border border-gray-200'
+                }`}>
 
                 {/* Header */}
                 <div className={`flex items-center justify-between p-4 border-b ${isDark ? 'border-white/5 bg-white/5' : 'border-gray-200 bg-gray-50'}`}>
@@ -165,23 +168,21 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({ isOpen, onClos
                                             value={sessionData.courseName}
                                             onChange={(e) => setSessionData({ ...sessionData, courseName: e.target.value })}
                                             placeholder="e.g. Adv. Calculus"
-                                            className={`w-full rounded-lg py-2 pl-9 pr-3 text-xs focus:outline-none ${
-                                                isDark ? 'bg-white/5 border border-white/10 text-white focus:border-apple-blue/50' : 'bg-white border border-gray-200 text-gray-900 focus:border-apple-blue/50'
-                                            }`}
+                                            className={`w-full rounded-lg py-2 pl-9 pr-3 text-xs focus:outline-none ${isDark ? 'bg-white/5 border border-white/10 text-white focus:border-apple-blue/50' : 'bg-white border border-gray-200 text-gray-900 focus:border-apple-blue/50'
+                                                }`}
                                         />
                                     </div>
                                 </div>
                                 <div className="space-y-1">
                                     <label className="text-[10px] text-gray-500 uppercase font-semibold pl-1">Time</label>
                                     <div className="relative">
-                                        <Clock size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                                        <Clock size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 z-10" />
                                         <input
+                                            type="datetime-local"
                                             value={sessionData.startTime}
                                             onChange={(e) => setSessionData({ ...sessionData, startTime: e.target.value })}
-                                            placeholder="e.g. Tmrw 2 PM"
-                                            className={`w-full rounded-lg py-2 pl-9 pr-3 text-xs focus:outline-none ${
-                                                isDark ? 'bg-white/5 border border-white/10 text-white focus:border-apple-blue/50' : 'bg-white border border-gray-200 text-gray-900 focus:border-apple-blue/50'
-                                            }`}
+                                            className={`w-full rounded-lg py-2 pl-9 pr-3 text-xs focus:outline-none ${isDark ? 'bg-white/5 border border-white/10 text-white focus:border-apple-blue/50 [&::-webkit-calendar-picker-indicator]:filter [&::-webkit-calendar-picker-indicator]:invert' : 'bg-white border border-gray-200 text-gray-900 focus:border-apple-blue/50'
+                                                }`}
                                         />
                                     </div>
                                 </div>
@@ -193,9 +194,8 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({ isOpen, onClos
                                             value={sessionData.topics}
                                             onChange={(e) => setSessionData({ ...sessionData, topics: e.target.value })}
                                             placeholder="e.g. Integration, Series"
-                                            className={`w-full rounded-lg py-2 pl-9 pr-3 text-xs focus:outline-none ${
-                                                isDark ? 'bg-white/5 border border-white/10 text-white focus:border-apple-blue/50' : 'bg-white border border-gray-200 text-gray-900 focus:border-apple-blue/50'
-                                            }`}
+                                            className={`w-full rounded-lg py-2 pl-9 pr-3 text-xs focus:outline-none ${isDark ? 'bg-white/5 border border-white/10 text-white focus:border-apple-blue/50' : 'bg-white border border-gray-200 text-gray-900 focus:border-apple-blue/50'
+                                                }`}
                                         />
                                     </div>
                                 </div>
@@ -207,9 +207,8 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({ isOpen, onClos
                                             value={sessionData.meetingLink}
                                             onChange={(e) => setSessionData({ ...sessionData, meetingLink: e.target.value })}
                                             placeholder="https://meet..."
-                                            className={`w-full rounded-lg py-2 pl-9 pr-3 text-xs focus:outline-none ${
-                                                isDark ? 'bg-white/5 border border-white/10 text-white focus:border-apple-blue/50' : 'bg-white border border-gray-200 text-gray-900 focus:border-apple-blue/50'
-                                            }`}
+                                            className={`w-full rounded-lg py-2 pl-9 pr-3 text-xs focus:outline-none ${isDark ? 'bg-white/5 border border-white/10 text-white focus:border-apple-blue/50' : 'bg-white border border-gray-200 text-gray-900 focus:border-apple-blue/50'
+                                                }`}
                                         />
                                     </div>
                                 </div>

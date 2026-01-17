@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { GlassCard } from '../components/GlassCard';
-import { Send, Sparkles, Brain, Clock, PlusCircle, Terminal, Info, Copy, Check, MessageSquare, Trash2, Plus } from 'lucide-react';
+import { Send, Sparkles, Brain, Clock, PlusCircle, Terminal, Info, Copy, Check, MessageSquare, Trash2, Plus, X } from 'lucide-react';
 import { geminiService } from '../services/geminiService';
 import { ChatMessage } from '../types';
 import { useTheme } from '../contexts/ThemeContext';
@@ -114,6 +114,7 @@ export const TutorView: React.FC = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [chats, setChats] = useState<any[]>([]);
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false); // Mobile history toggle
 
   const chatEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -276,17 +277,32 @@ export const TutorView: React.FC = () => {
   };
 
   return (
-    <div className="max-w-6xl mx-auto h-[calc(100vh-140px)] flex gap-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
+    <div className="max-w-[100%] lg:max-w-[95%] w-full mx-auto h-[calc(100vh-140px)] md:h-[calc(100vh-180px)] flex flex-col lg:flex-row gap-0 lg:gap-6 animate-in fade-in slide-in-from-bottom-2 duration-500 overflow-hidden relative">
 
-      {/* Sidebar history */}
-      <div className="w-64 flex-shrink-0 flex flex-col gap-4">
+      {/* Sidebar history - Responsive: Drawer on mobile, Sidebar on desktop */}
+      <div className={`
+        fixed lg:relative inset-y-0 left-0 z-50 w-80 max-w-[85%] lg:w-80 lg:max-h-full
+        flex flex-col gap-3 lg:gap-4 p-4 lg:p-0
+        transition-transform duration-300 transform lg:translate-x-0
+        ${isHistoryOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+        ${isDark ? 'bg-black/95 lg:bg-transparent' : 'bg-white/95 lg:bg-transparent'}
+        backdrop-blur-xl lg:backdrop-blur-none border-r lg:border-none ${isDark ? 'border-white/10' : 'border-gray-200'}
+      `}>
+        {/* Mobile Close Button */}
+        <button
+          onClick={() => setIsHistoryOpen(false)}
+          className="lg:hidden absolute top-4 right-4 p-2 rounded-xl bg-white/5 text-gray-400"
+        >
+          <X size={20} />
+        </button>
+
         {/* New Chat Button */}
         <button
-          onClick={createNewChat}
-          className="w-full flex items-center gap-3 px-4 py-3 bg-apple-blue hover:bg-apple-blue/90 text-white rounded-2xl transition-all shadow-lg shadow-apple-blue/20 group"
+          onClick={() => { createNewChat(); setIsHistoryOpen(false); }}
+          className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-apple-blue hover:bg-apple-blue/90 text-white rounded-2xl transition-all shadow-lg shadow-apple-blue/20 group"
         >
           <Plus size={20} />
-          <span className="font-semibold">New Chat</span>
+          <span className="font-semibold text-sm">New Chat</span>
         </button>
 
         {/* List */}
@@ -295,21 +311,19 @@ export const TutorView: React.FC = () => {
             {chats.map(chat => (
               <div
                 key={chat.id}
-                onClick={() => selectChat(chat.id)}
-                className={`group p-3 rounded-xl cursor-pointer transition-all border ${
-                  currentChatId === chat.id 
-                    ? isDark ? 'bg-white/10 border-white/10' : 'bg-blue-50 border-blue-200' 
-                    : isDark ? 'hover:bg-white/5 border-transparent' : 'hover:bg-gray-50 border-transparent'
-                }`}
+                onClick={() => { selectChat(chat.id); setIsHistoryOpen(false); }}
+                className={`group p-3 rounded-xl cursor-pointer transition-all border ${currentChatId === chat.id
+                  ? isDark ? 'bg-white/10 border-white/10' : 'bg-blue-50 border-blue-200'
+                  : isDark ? 'hover:bg-white/5 border-transparent' : 'hover:bg-gray-50 border-transparent'
+                  }`}
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-2 overflow-hidden">
                     <MessageSquare size={14} className={currentChatId === chat.id ? "text-apple-blue" : isDark ? "text-gray-500" : "text-gray-400"} />
-                    <span className={`text-sm truncate ${
-                      currentChatId === chat.id 
-                        ? isDark ? 'text-white font-medium' : 'text-blue-700 font-medium'
-                        : isDark ? 'text-gray-400 group-hover:text-gray-200' : 'text-gray-600 group-hover:text-gray-800'
-                    }`}>
+                    <span className={`text-sm truncate ${currentChatId === chat.id
+                      ? isDark ? 'text-white font-medium' : 'text-blue-700 font-medium'
+                      : isDark ? 'text-gray-400 group-hover:text-gray-200' : 'text-gray-600 group-hover:text-gray-800'
+                      }`}>
                       {chat.title || 'Conversation'}
                     </span>
                   </div>
@@ -334,50 +348,63 @@ export const TutorView: React.FC = () => {
         </GlassCard>
       </div>
 
+      {/* Overlay - Mobile history */}
+      {isHistoryOpen && (
+        <div
+          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[45] lg:hidden"
+          onClick={() => setIsHistoryOpen(false)}
+        ></div>
+      )}
+
       {/* Main Chat Area */}
       <div className="flex-1 flex flex-col min-h-0 relative">
         {/* Header inside chat area */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 px-2 mb-4">
-          <div className="flex items-center gap-4">
-            <div className="w-10 h-10 apple-gradient rounded-[14px] flex items-center justify-center shadow-lg shadow-blue-500/20">
-              <Sparkles className="text-white" size={20} />
+        <div className="flex items-center justify-between gap-2 px-1 lg:px-2 mb-3 lg:mb-2">
+          <div className="flex items-center gap-2 lg:gap-4">
+            <button
+              onClick={() => setIsHistoryOpen(true)}
+              className="lg:hidden p-2 rounded-xl bg-white/5 border border-white/10 text-gray-400 hover:text-white transition-all shadow-lg"
+            >
+              <Clock size={16} />
+            </button>
+            <div className="hidden sm:flex w-6 h-6 lg:w-8 lg:h-8 apple-gradient rounded-[8px] lg:rounded-[12px] items-center justify-center shadow-lg shadow-blue-500/20">
+              <Sparkles className="text-white" size={14} />
             </div>
             <div>
-              <h2 className={`text-xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r ${isDark ? 'from-white to-gray-400' : 'from-gray-900 to-gray-600'}`}>AI Tutor</h2>
-              <div className={`flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wider ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
-                {currentChatId ? 'Active Session' : 'New Session'}
+              <h2 className={`text-sm lg:text-lg font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r ${isDark ? 'from-white to-gray-400' : 'from-gray-900 to-gray-600'}`}>AI Tutor</h2>
+              <div className={`flex items-center gap-2 text-[8px] lg:text-[10px] font-semibold uppercase tracking-wider ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                {currentChatId ? 'Active' : 'New'}
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+
+          <div className="flex items-center bg-white/5 p-1 rounded-xl border border-white/5">
             <button
               onClick={() => setMode('general')}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-xl transition-colors cursor-pointer border ${
-                mode === 'general' 
-                  ? isDark ? 'bg-white/10 border-white/20 text-white' : 'bg-blue-50 border-blue-200 text-blue-700'
-                  : isDark ? 'bg-transparent border-transparent text-gray-400 hover:text-white' : 'bg-transparent border-transparent text-gray-500 hover:text-gray-700'
-              }`}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg transition-all cursor-pointer ${mode === 'general'
+                ? isDark ? 'bg-white/10 text-white shadow-sm' : 'bg-blue-50 text-blue-700'
+                : isDark ? 'text-gray-500 hover:text-white' : 'text-gray-500 hover:text-gray-700'
+                }`}
             >
-              <Sparkles size={14} className={mode === 'general' ? "text-yellow-400" : ""} />
-              <span className="text-[10px] font-semibold">General</span>
+              <Sparkles size={12} className={mode === 'general' ? "text-yellow-400" : ""} />
+              <span className="text-[9px] lg:text-[10px] font-bold uppercase tracking-wide">General</span>
             </button>
             <button
               onClick={() => setMode('resource')}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-xl transition-colors cursor-pointer border ${
-                mode === 'resource' 
-                  ? isDark ? 'bg-white/10 border-white/20 text-white' : 'bg-purple-50 border-purple-200 text-purple-700'
-                  : isDark ? 'bg-transparent border-transparent text-gray-400 hover:text-white' : 'bg-transparent border-transparent text-gray-500 hover:text-gray-700'
-              }`}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg transition-all cursor-pointer ${mode === 'resource'
+                ? isDark ? 'bg-white/10 text-white shadow-sm' : 'bg-purple-50 text-purple-700'
+                : isDark ? 'text-gray-500 hover:text-white' : 'text-gray-500 hover:text-gray-700'
+                }`}
             >
-              <Brain size={14} className={mode === 'resource' ? "text-purple-400" : ""} />
-              <span className="text-[10px] font-semibold">Resources</span>
+              <Brain size={12} className={mode === 'resource' ? "text-purple-400" : ""} />
+              <span className="text-[9px] lg:text-[10px] font-bold uppercase tracking-wide">Resources</span>
             </button>
           </div>
         </div>
 
-        <GlassCard className={`flex-1 flex flex-col overflow-hidden shadow-[0_32px_64px_-16px_rgba(0,0,0,0.5)] ${isDark ? 'border-white/5' : 'border-gray-200'}`}>
+        <GlassCard className={`flex-1 flex flex-col overflow-hidden shadow-2xl ${isDark ? 'border-white/5' : 'border-gray-200'}`}>
           {/* Scrollable Feed */}
-          <div className="flex-1 overflow-y-auto p-6 md:p-10 space-y-10 scroll-smooth scrollbar-hide">
+          <div className="flex-1 overflow-y-auto p-4 lg:p-10 space-y-6 lg:space-y-10 lg:scrollbar-hide">
             {messages.map((msg, i) => (
               <div
                 key={i}
@@ -385,7 +412,7 @@ export const TutorView: React.FC = () => {
               >
                 <div className={`flex gap-4 max-w-[95%] md:max-w-[85%] ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
                   {/* Avatar */}
-                  <div className={`w-8 h-8 rounded-xl flex-shrink-0 flex items-center justify-center shadow-lg ${msg.role === 'user' 
+                  <div className={`w-8 h-8 rounded-xl flex-shrink-0 flex items-center justify-center shadow-lg ${msg.role === 'user'
                     ? isDark ? 'bg-white/10 border border-white/10' : 'bg-gray-100 border border-gray-200'
                     : 'apple-gradient'
                     }`}>
@@ -395,7 +422,7 @@ export const TutorView: React.FC = () => {
                   {/* Bubble */}
                   <div className={`rounded-3xl px-6 py-5 text-sm md:text-base ${msg.role === 'user'
                     ? 'bg-apple-blue text-white rounded-tr-none shadow-xl shadow-apple-blue/10'
-                    : isDark 
+                    : isDark
                       ? 'glass border-white/10 text-gray-200 rounded-tl-none'
                       : 'bg-gray-100 border border-gray-200 text-gray-700 rounded-tl-none'
                     }`}>
@@ -435,11 +462,10 @@ export const TutorView: React.FC = () => {
                   }}
                   rows={Math.min(input.split('\n').length, 5)}
                   placeholder="Message your academic partner..."
-                  className={`w-full border rounded-[24px] py-3 pl-5 pr-12 text-sm focus:outline-none focus:ring-2 focus:ring-apple-blue/30 focus:border-apple-blue/50 transition-all resize-none shadow-inner ${
-                    isDark 
-                      ? 'bg-white/5 border-white/10 placeholder:text-gray-600 text-white' 
-                      : 'bg-white border-gray-200 placeholder:text-gray-400 text-gray-800'
-                  }`}
+                  className={`w-full border rounded-[24px] py-3 pl-5 pr-12 text-sm focus:outline-none focus:ring-2 focus:ring-apple-blue/30 focus:border-apple-blue/50 transition-all resize-none shadow-inner ${isDark
+                    ? 'bg-white/5 border-white/10 placeholder:text-gray-600 text-white'
+                    : 'bg-white border-gray-200 placeholder:text-gray-400 text-gray-800'
+                    }`}
                 />
                 <button
                   onClick={handleSend}
@@ -456,11 +482,10 @@ export const TutorView: React.FC = () => {
               <button
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isUploading}
-                className={`p-3 rounded-xl transition-all group overflow-hidden relative active:scale-95 flex-shrink-0 ${
-                  isDark 
-                    ? 'glass border-white/10 hover:border-white/20' 
-                    : 'bg-white border border-gray-200 hover:border-gray-300 shadow-sm'
-                }`}
+                className={`p-3 rounded-xl transition-all group overflow-hidden relative active:scale-95 flex-shrink-0 ${isDark
+                  ? 'glass border-white/10 hover:border-white/20'
+                  : 'bg-white border border-gray-200 hover:border-gray-300 shadow-sm'
+                  }`}
               >
                 {isUploading ? (
                   <Sparkles size={20} className="text-apple-blue animate-spin" />

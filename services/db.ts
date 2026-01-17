@@ -24,8 +24,12 @@ export const db = {
         return res.json();
     },
 
-    likePost: async (id: string): Promise<Post[]> => {
-        const res = await fetch(`${API_URL}/posts/${id}/like`, { method: 'POST' });
+    likePost: async (id: string, userId: string): Promise<Post[]> => {
+        const res = await fetch(`${API_URL}/posts/${id}/like`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId })
+        });
         return res.json();
     },
 

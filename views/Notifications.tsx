@@ -1,106 +1,126 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { GlassCard } from '../components/GlassCard';
 import { useTheme } from '../contexts/ThemeContext';
 import {
-  ArrowLeft, Bell, Heart, MessageCircle, Calendar, Users,
-  CheckCheck, Trash2, Settings
+  ArrowLeft, Bell, Heart, MessageCircle, CheckCircle2,
+  CheckCheck, Trash2
 } from 'lucide-react';
 import { formatRelativeTime } from '../utils/date';
 
 interface Notification {
   id: string;
-  type: 'like' | 'comment' | 'session' | 'follow' | 'system';
+  type: 'like' | 'comment' | 'project_accepted';
   title: string;
   message: string;
-  timestamp: string;
-  read: boolean;
-  avatar?: string;
+  post_id?: string;
+  project_id?: string;
+  actor_id: string;
+  actor_name: string;
+  actor_avatar: string;
+  read: number;
+  created_at: string;
 }
 
 interface NotificationsViewProps {
   onBack: () => void;
-  onOpenSettings: () => void;
 }
 
-export const NotificationsView: React.FC<NotificationsViewProps> = ({ onBack, onOpenSettings }) => {
+export const NotificationsView: React.FC<NotificationsViewProps> = ({ onBack }) => {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const [notifications, setNotifications] = useState<Notification[]>([
-    {
-      id: '1',
-      type: 'like',
-      title: 'New Like',
-      message: 'Sarah Chen liked your post about Machine Learning',
-      timestamp: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
-      read: false,
-      avatar: 'https://ui-avatars.com/api/?name=Sarah+Chen&background=random'
-    },
-    {
-      id: '2',
-      type: 'comment',
-      title: 'New Comment',
-      message: 'Alex Kim commented: "Great explanation! This helped me a lot."',
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
-      read: false,
-      avatar: 'https://ui-avatars.com/api/?name=Alex+Kim&background=random'
-    },
-    {
-      id: '3',
-      type: 'session',
-      title: 'Session Reminder',
-      message: 'CS101 Study Group starts in 1 hour',
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 3).toISOString(),
-      read: true,
-    },
-    {
-      id: '4',
-      type: 'follow',
-      title: 'New Follower',
-      message: 'John Doe started following you',
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
-      read: true,
-      avatar: 'https://ui-avatars.com/api/?name=John+Doe&background=random'
-    },
-    {
-      id: '5',
-      type: 'system',
-      title: 'Welcome to LearnSphere!',
-      message: 'Start exploring and connecting with fellow students.',
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 48).toISOString(),
-      read: true,
-    },
-  ]);
+  useEffect(() => {
+    loadNotifications();
+  }, []);
+
+  const loadNotifications = async () => {
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    if (!user.id) return;
+
+    try {
+      const res = await fetch(`http://localhost:3001/api/notifications?userId=${user.id}`);
+      const data = await res.json();
+      setNotifications(data);
+    } catch (e) {
+      console.error('Failed to load notifications:', e);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const getIcon = (type: string) => {
     switch (type) {
       case 'like': return <Heart size={16} className="text-pink-500" />;
       case 'comment': return <MessageCircle size={16} className="text-apple-blue" />;
-      case 'session': return <Calendar size={16} className="text-indigo-500" />;
-      case 'follow': return <Users size={16} className="text-green-500" />;
+      case 'project_accepted': return <CheckCircle2 size={16} className="text-green-500" />;
       default: return <Bell size={16} className="text-gray-500" />;
     }
   };
 
-  const markAsRead = (id: string) => {
-    setNotifications(prev =>
-      prev.map(n => n.id === id ? { ...n, read: true } : n)
-    );
+  const markAsRead = async (id: string) => {
+    try {
+      await fetch('http://localhost:3001/api/notifications/mark-read', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ notificationId: id })
+      });
+      setNotifications(prev =>
+        prev.map(n => n.id === id ? { ...n, read: 1 } : n)
+      );
+    } catch (e) {
+      console.error('Failed to mark as read:', e);
+    }
   };
 
-  const markAllAsRead = () => {
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+  const markAllAsRead = async () => {
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    try {
+      await fetch('http://localhost:3001/api/notifications/mark-all-read', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id })
+      });
+      setNotifications(prev => prev.map(n => ({ ...n, read: 1 })));
+    } catch (e) {
+      console.error('Failed to mark all as read:', e);
+    }
   };
 
-  const deleteNotification = (id: string) => {
-    setNotifications(prev => prev.filter(n => n.id !== id));
+  const deleteNotification = async (id: string) => {
+    try {
+      await fetch(`http://localhost:3001/api/notifications/${id}`, {
+        method: 'DELETE'
+      });
+      setNotifications(prev => prev.filter(n => n.id !== id));
+    } catch (e) {
+      console.error('Failed to delete notification:', e);
+    }
   };
 
-  const clearAll = () => {
-    setNotifications([]);
+  const clearAll = async () => {
+    if (!window.confirm('Clear all notifications?')) return;
+
+    try {
+      await Promise.all(notifications.map(n =>
+        fetch(`http://localhost:3001/api/notifications/${n.id}`, { method: 'DELETE' })
+      ));
+      setNotifications([]);
+    } catch (e) {
+      console.error('Failed to clear all:', e);
+    }
   };
 
   const unreadCount = notifications.filter(n => !n.read).length;
+
+  if (loading) {
+    return (
+      <div className="max-w-2xl mx-auto flex items-center justify-center py-20">
+        <div className="w-12 h-12 apple-gradient rounded-2xl animate-pulse"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-2xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -130,13 +150,6 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({ onBack, on
               <CheckCheck size={20} />
             </button>
           )}
-          <button
-            onClick={onOpenSettings}
-            className={`p-2 rounded-xl transition-colors ${isDark ? 'hover:bg-white/10 text-gray-400' : 'hover:bg-gray-100 text-gray-600'}`}
-            title="Notification settings"
-          >
-            <Settings size={20} />
-          </button>
         </div>
       </div>
 
@@ -146,25 +159,23 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({ onBack, on
           {notifications.map((notification) => (
             <div
               key={notification.id}
-              onClick={() => markAsRead(notification.id)}
-              className={`p-4 flex items-start gap-4 cursor-pointer transition-colors ${
-                !notification.read 
-                  ? isDark ? 'bg-apple-blue/5' : 'bg-blue-50' 
+              onClick={() => !notification.read && markAsRead(notification.id)}
+              className={`p-4 flex items-start gap-4 cursor-pointer transition-colors ${!notification.read
+                  ? isDark ? 'bg-apple-blue/5' : 'bg-blue-50'
                   : isDark ? 'hover:bg-white/5' : 'hover:bg-gray-50'
-              }`}
+                }`}
             >
               {/* Avatar or Icon */}
               <div className="flex-shrink-0">
-                {notification.avatar ? (
+                {notification.actor_avatar ? (
                   <img
-                    src={notification.avatar}
+                    src={notification.actor_avatar}
                     alt=""
                     className="w-10 h-10 rounded-full"
                   />
                 ) : (
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                    isDark ? 'bg-white/10' : 'bg-gray-100'
-                  }`}>
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${isDark ? 'bg-white/10' : 'bg-gray-100'
+                    }`}>
                     {getIcon(notification.type)}
                   </div>
                 )}
@@ -186,16 +197,15 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({ onBack, on
                   )}
                 </div>
                 <p className="text-[10px] text-gray-500 mt-1">
-                  {formatRelativeTime(notification.timestamp)}
+                  {formatRelativeTime(notification.created_at)}
                 </p>
               </div>
 
               {/* Delete */}
               <button
                 onClick={(e) => { e.stopPropagation(); deleteNotification(notification.id); }}
-                className={`p-2 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity ${
-                  isDark ? 'hover:bg-white/10 text-gray-500' : 'hover:bg-gray-100 text-gray-400'
-                }`}
+                className={`p-2 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity ${isDark ? 'hover:bg-white/10 text-gray-500' : 'hover:bg-gray-100 text-gray-400'
+                  }`}
               >
                 <Trash2 size={14} />
               </button>
@@ -218,9 +228,8 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({ onBack, on
       {notifications.length > 0 && (
         <button
           onClick={clearAll}
-          className={`w-full mt-4 py-3 rounded-xl text-sm font-medium transition-colors ${
-            isDark ? 'text-gray-400 hover:text-white hover:bg-white/5' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
-          }`}
+          className={`w-full mt-4 py-3 rounded-xl text-sm font-medium transition-colors ${isDark ? 'text-gray-400 hover:text-white hover:bg-white/5' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
+            }`}
         >
           Clear all notifications
         </button>

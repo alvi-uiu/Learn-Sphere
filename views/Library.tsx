@@ -6,6 +6,7 @@ import { Note, Resource } from '../types';
 import { geminiService } from '../services/geminiService';
 import { useToast } from '../components/Toast';
 import { db } from '../services/db';
+import { useTheme } from '../contexts/ThemeContext';
 
 const DEPARTMENTS = ['CSE', 'EEE', 'BBA', 'English', 'Law', 'Architecture'];
 const TRIMESTERS = ['Spring', 'Summer', 'Fall'];
@@ -185,53 +186,56 @@ const AIResultModal: React.FC<{
   mode: 'explain' | 'practice';
   title: string;
 }> = ({ isOpen, onClose, result, mode, title }) => {
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
+
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-300">
-      <GlassCard className="w-full max-w-4xl max-h-[90vh] flex flex-col p-0 overflow-hidden border-apple-blue/20 shadow-2xl shadow-apple-blue/5">
-        <div className="p-6 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
+    <div className={`fixed inset-0 z-[60] flex items-center justify-center p-4 backdrop-blur-md animate-in fade-in duration-300 ${isDark ? 'bg-black/80' : 'bg-white/60'}`}>
+      <GlassCard className={`w-full max-w-4xl max-h-[90vh] flex flex-col p-0 overflow-hidden shadow-2xl ${isDark ? 'border-apple-blue/20 shadow-apple-blue/5' : 'border-gray-200 shadow-xl'}`}>
+        <div className={`p-6 border-b flex items-center justify-between ${isDark ? 'bg-white/[0.02] border-white/5' : 'bg-gray-50 border-gray-200'}`}>
           <div className="flex items-center gap-3">
-            <div className={`p-2 rounded-xl ${mode === 'explain' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-purple-500/20 text-purple-400'}`}>
+            <div className={`p-2 rounded-xl ${mode === 'explain' ? 'bg-yellow-500/20 text-yellow-500' : 'bg-purple-500/20 text-purple-500'}`}>
               {mode === 'explain' ? <Sparkles size={20} /> : <Brain size={20} />}
             </div>
             <div>
-              <h3 className="font-bold text-lg">{mode === 'explain' ? 'Clear Explanation' : 'Practice Set'}</h3>
+              <h3 className={`font-bold text-lg ${isDark ? 'text-white' : 'text-gray-900'}`}>{mode === 'explain' ? 'Clear Explanation' : 'Practice Set'}</h3>
               <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Resource: {title}</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-white/5 rounded-full text-gray-400 hover:text-white transition-colors">
+          <button onClick={onClose} className={`p-2 rounded-full transition-colors ${isDark ? 'hover:bg-white/5 text-gray-400 hover:text-white' : 'hover:bg-gray-200 text-gray-500 hover:text-gray-900'}`}>
             <X size={20} />
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-8 bg-black/20">
-          <div className="prose prose-invert max-w-none prose-p:text-gray-300 prose-headings:text-white prose-strong:text-apple-blue">
+        <div className={`flex-1 overflow-y-auto p-8 ${isDark ? 'bg-black/20' : 'bg-white'}`}>
+          <div className={`prose max-w-none prose-p:leading-relaxed ${isDark ? 'prose-invert prose-p:text-gray-300 prose-headings:text-white prose-strong:text-apple-blue' : 'prose-headings:text-gray-900 prose-p:text-gray-700 prose-strong:text-blue-600'}`}>
             {/* Simple Markdown-like rendering */}
             <div className="space-y-4">
               {result.split('\n').filter(line => line.trim()).map((line, i) => {
-                if (line.startsWith('# ')) return <h1 key={i} className="text-2xl font-bold mt-6 mb-4">{line.slice(2)}</h1>;
-                if (line.startsWith('## ')) return <h2 key={i} className="text-xl font-bold mt-5 mb-3">{line.slice(3)}</h2>;
-                if (line.startsWith('### ')) return <h3 key={i} className="text-lg font-bold mt-4 mb-2">{line.slice(4)}</h3>;
+                if (line.startsWith('# ')) return <h1 key={i} className={`text-2xl font-bold mt-6 mb-4 ${isDark ? 'text-white' : 'text-gray-900'}`}>{line.slice(2)}</h1>;
+                if (line.startsWith('## ')) return <h2 key={i} className={`text-xl font-bold mt-5 mb-3 ${isDark ? 'text-white' : 'text-gray-800'}`}>{line.slice(3)}</h2>;
+                if (line.startsWith('### ')) return <h3 key={i} className={`text-lg font-bold mt-4 mb-2 ${isDark ? 'text-white' : 'text-gray-800'}`}>{line.slice(4)}</h3>;
                 if (line.startsWith('- ') || line.startsWith('* ')) return (
                   <div key={i} className="flex gap-3 ml-2">
                     <span className="text-apple-blue mt-1.5">•</span>
-                    <span className="text-gray-300">{line.replace(/^[-*]\s+/, '')}</span>
+                    <span className={`${isDark ? 'text-gray-300' : 'text-gray-700'}`}>{line.replace(/^[-*]\s+/, '')}</span>
                   </div>
                 );
                 if (line.match(/^\d+\.\s/)) return (
                   <div key={i} className="flex gap-3 ml-2">
                     <span className="text-apple-blue font-mono text-xs mt-1">{line.match(/^\d+/)?.[0]}.</span>
-                    <span className="text-gray-300">{line.replace(/^\d+\.\s+/, '')}</span>
+                    <span className={`${isDark ? 'text-gray-300' : 'text-gray-700'}`}>{line.replace(/^\d+\.\s+/, '')}</span>
                   </div>
                 );
-                return <p key={i} className="leading-relaxed text-gray-300">{line}</p>;
+                return <p key={i} className={`leading-relaxed ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>{line}</p>;
               })}
             </div>
           </div>
         </div>
 
-        <div className="p-4 bg-white/[0.02] border-t border-white/5 flex justify-end">
+        <div className={`p-4 flex justify-end border-t ${isDark ? 'bg-white/[0.02] border-white/5' : 'bg-gray-50 border-gray-200'}`}>
           <button
             onClick={onClose}
             className="px-6 py-2 bg-apple-blue text-white rounded-xl font-bold text-sm hover:opacity-90 transition-all shadow-lg shadow-apple-blue/20"

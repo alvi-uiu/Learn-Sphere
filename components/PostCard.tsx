@@ -27,9 +27,10 @@ interface PostCardProps {
     currentUser: User;
     onUpdate: (updatedPost: Post) => void;
     onDelete: (postId: string) => void;
+    onUserClick?: (userId: string) => void;
 }
 
-export const PostCard: React.FC<PostCardProps> = ({ post: initialPost, currentUser, onUpdate, onDelete }) => {
+export const PostCard: React.FC<PostCardProps> = ({ post: initialPost, currentUser, onUpdate, onDelete, onUserClick }) => {
     const { showToast } = useToast();
     const { theme } = useTheme();
     const isDark = theme === 'dark';
@@ -60,12 +61,22 @@ export const PostCard: React.FC<PostCardProps> = ({ post: initialPost, currentUs
 
     // Like Handler
     const handleLike = async () => {
-        // Optimistic
-        setPost(prev => ({ ...prev, likes: prev.likes + 1 }));
+        if (!currentUser?.id) return;
+        const isLiked = post.likedBy?.includes(currentUser.id);
+
+        // Optimistic update
+        setPost(prev => ({
+            ...prev,
+            likes: isLiked ? prev.likes - 1 : prev.likes + 1,
+            likedBy: isLiked
+                ? prev.likedBy?.filter(id => id !== currentUser.id)
+                : [...(prev.likedBy || []), currentUser.id]
+        }));
+
         try {
-            await db.likePost(post.id);
+            await db.likePost(post.id, currentUser.id);
         } catch (e) {
-            setPost(initialPost); // Revert
+            setPost(initialPost); // Revert on error
             console.error(e);
         }
     };
@@ -214,7 +225,7 @@ export const PostCard: React.FC<PostCardProps> = ({ post: initialPost, currentUs
                         <span className="text-[10px] text-gray-500">{formatRelativeTime(comment.created_at)}</span>
                     </div>
                     <p className={`text-xs ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>{comment.content}</p>
-                    
+
                     {/* Reply button */}
                     <div className="flex items-center gap-4 mt-2">
                         <button
@@ -245,9 +256,8 @@ export const PostCard: React.FC<PostCardProps> = ({ post: initialPost, currentUs
                         onChange={(e) => setReplyContent(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && handleReply(comment.id)}
                         placeholder={`Reply to ${comment.user_name}...`}
-                        className={`flex-1 rounded-lg py-2 px-3 text-xs focus:outline-none focus:ring-1 focus:ring-apple-blue ${
-                            isDark ? 'bg-white/5 border border-white/10 text-white' : 'bg-gray-100 border border-gray-200 text-gray-900'
-                        }`}
+                        className={`flex-1 rounded-lg py-2 px-3 text-xs focus:outline-none focus:ring-1 focus:ring-apple-blue ${isDark ? 'bg-white/5 border border-white/10 text-white' : 'bg-gray-100 border border-gray-200 text-gray-900'
+                            }`}
                         autoFocus
                     />
                     <button
@@ -281,12 +291,48 @@ export const PostCard: React.FC<PostCardProps> = ({ post: initialPost, currentUs
             {/* Header */}
             <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
-                    <img src={post.avatar} className={`w-11 h-11 rounded-2xl border ${isDark ? 'border-white/10' : 'border-gray-200'}`} alt={post.author} />
+                    <img
+                        src={post.avatar}
+                        onClick={() => onUserClick?.(post.authorId)}
+                        className={`w-11 h-11 rounded-2xl border ${isDark ? 'border-white/10' : 'border-gray-200'} ${onUserClick ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
+                        alt={post.author}
+                    />
                     <div>
-                        <div className="flex items-center gap-2">
-                            <h4 className={`font-bold text-sm ${isDark ? 'text-white' : 'text-gray-900'}`}>{post.author}</h4>
+                        <div className="flex items-center gap-2 flex-wrap">
+                            <h4
+                                onClick={() => onUserClick?.(post.authorId)}
+                                className={`font-bold text-sm ${isDark ? 'text-white' : 'text-gray-900'} ${onUserClick ? 'cursor-pointer hover:text-apple-blue transition-colors' : ''}`}
+                            >
+                                {post.author}
+                            </h4>
                             {post.author.includes('Sys') && <CheckCircle2 size={12} className="text-apple-blue fill-apple-blue/10" />}
+
+                            {/* dynamic privacy check */}
+                            {(() => {
+                                const isOwner = post.authorId === currentUser.id;
+                                const showId = isOwner ? currentUser.isIdVisible : post.authorIsIdVisible;
+                                const sid = isOwner ? currentUser.studentId : post.authorStudentId;
+
+                                return showId && sid ? (
+                                    <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-md uppercase tracking-wider ${isDark ? 'bg-white/10 text-gray-300' : 'bg-gray-100 text-gray-600'}`}>
+                                        {sid}
+                                    </span>
+                                ) : null;
+                            })()}
                         </div>
+
+                        {(() => {
+                            const isOwner = post.authorId === currentUser.id;
+                            const showEmail = isOwner ? currentUser.isEmailVisible : post.authorIsEmailVisible;
+                            const email = isOwner ? currentUser.email : post.authorEmail;
+
+                            return showEmail && email ? (
+                                <p className={`text-[10px] mb-0.5 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                                    {email}
+                                </p>
+                            ) : null;
+                        })()}
+
                         <p className="text-[10px] text-gray-500 font-medium">
                             {formatRelativeTime(post.timestamp)} • <span className="text-apple-blue/80">{post.category}</span>
                         </p>
@@ -303,22 +349,19 @@ export const PostCard: React.FC<PostCardProps> = ({ post: initialPost, currentUs
                     </button>
 
                     {isMenuOpen && currentUser.id === post.authorId && (
-                        <div className={`absolute right-0 top-full mt-2 w-32 rounded-xl shadow-xl z-10 overflow-hidden animate-in fade-in slide-in-from-top-2 ${
-                            isDark ? 'bg-gray-900 border border-white/10' : 'bg-white border border-gray-200'
-                        }`}>
+                        <div className={`absolute right-0 top-full mt-2 w-32 rounded-xl shadow-xl z-30 overflow-hidden animate-in fade-in slide-in-from-top-2 ${isDark ? 'bg-gray-900 border border-white/10' : 'bg-white border border-gray-200'
+                            }`}>
                             <button
                                 onClick={() => { setIsEditing(true); setIsMenuOpen(false); }}
-                                className={`w-full text-left px-4 py-2.5 text-xs flex items-center gap-2 ${
-                                    isDark ? 'text-gray-400 hover:bg-white/5 hover:text-white' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                                }`}
+                                className={`w-full text-left px-4 py-2.5 text-xs flex items-center gap-2 ${isDark ? 'text-gray-400 hover:bg-white/5 hover:text-white' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                                    }`}
                             >
                                 <Edit2 size={12} /> Edit
                             </button>
                             <button
                                 onClick={() => { handleDelete(); setIsMenuOpen(false); }}
-                                className={`w-full text-left px-4 py-2.5 text-xs text-red-500 flex items-center gap-2 border-t ${
-                                    isDark ? 'hover:bg-red-500/10 border-white/5' : 'hover:bg-red-50 border-gray-200'
-                                }`}
+                                className={`w-full text-left px-4 py-2.5 text-xs text-red-500 flex items-center gap-2 border-t ${isDark ? 'hover:bg-red-500/10 border-white/5' : 'hover:bg-red-50 border-gray-200'
+                                    }`}
                             >
                                 <Trash2 size={12} /> Delete
                             </button>
@@ -333,9 +376,8 @@ export const PostCard: React.FC<PostCardProps> = ({ post: initialPost, currentUs
                     <textarea
                         value={editContent}
                         onChange={(e) => setEditContent(e.target.value)}
-                        className={`w-full rounded-xl p-3 text-sm focus:outline-none min-h-[100px] ${
-                            isDark ? 'bg-white/5 border border-white/10 text-white focus:border-apple-blue/50' : 'bg-gray-50 border border-gray-200 text-gray-900 focus:border-apple-blue/50'
-                        }`}
+                        className={`w-full rounded-xl p-3 text-sm focus:outline-none min-h-[100px] ${isDark ? 'bg-white/5 border border-white/10 text-white focus:border-apple-blue/50' : 'bg-gray-50 border border-gray-200 text-gray-900 focus:border-apple-blue/50'
+                            }`}
                     />
                     <div className="flex justify-end gap-2 mt-2">
                         <button onClick={() => setIsEditing(false)} className={`px-3 py-1.5 rounded-lg text-xs font-medium ${isDark ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-gray-700'}`}>Cancel</button>
@@ -348,9 +390,8 @@ export const PostCard: React.FC<PostCardProps> = ({ post: initialPost, currentUs
 
             {/* Session Card */}
             {post.sessionData && (
-                <div className={`mb-4 rounded-2xl p-4 relative overflow-hidden ${
-                    isDark ? 'bg-gradient-to-br from-indigo-500/10 to-purple-500/10 border border-indigo-500/20' : 'bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-100'
-                }`}>
+                <div className={`mb-4 rounded-2xl p-4 relative overflow-hidden ${isDark ? 'bg-gradient-to-br from-indigo-500/10 to-purple-500/10 border border-indigo-500/20' : 'bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-100'
+                    }`}>
                     <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 blur-3xl rounded-full -translate-y-1/2 translate-x-1/2"></div>
 
                     <div className="flex items-start justify-between mb-3 relative z-10">
@@ -405,9 +446,8 @@ export const PostCard: React.FC<PostCardProps> = ({ post: initialPost, currentUs
                         {docs.length > 0 && (
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                 {docs.map((doc, i) => (
-                                    <a key={i} href={doc.file_path} download className={`flex items-center gap-3 p-3 rounded-xl transition-all group ${
-                                        isDark ? 'bg-white/5 border border-white/10 hover:bg-white/10' : 'bg-gray-50 border border-gray-200 hover:bg-gray-100'
-                                    }`}>
+                                    <a key={i} href={doc.file_path} download className={`flex items-center gap-3 p-3 rounded-xl transition-all group ${isDark ? 'bg-white/5 border border-white/10 hover:bg-white/10' : 'bg-gray-50 border border-gray-200 hover:bg-gray-100'
+                                        }`}>
                                         <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center text-green-600">
                                             <FileText size={16} />
                                         </div>
@@ -430,8 +470,8 @@ export const PostCard: React.FC<PostCardProps> = ({ post: initialPost, currentUs
                     onClick={handleLike}
                     className="flex items-center gap-2 group/btn"
                 >
-                    <Heart size={20} className={`transition-all active:scale-90 ${post.likes > initialPost.likes ? 'text-pink-500 fill-pink-500/20' : 'text-gray-500 group-hover/btn:text-pink-500'}`} />
-                    <span className="text-xs font-bold text-gray-500 group-hover/btn:text-pink-500">{post.likes}</span>
+                    <Heart size={20} className={`transition-all active:scale-90 ${post.likedBy?.includes(currentUser.id) ? 'text-pink-500 fill-pink-500' : 'text-gray-500 group-hover/btn:text-pink-500'}`} />
+                    <span className={`text-xs font-bold group-hover/btn:text-pink-500 ${post.likedBy?.includes(currentUser.id) ? 'text-pink-500' : 'text-gray-500'}`}>{post.likes}</span>
                 </button>
                 <button
                     onClick={toggleComments}
@@ -477,9 +517,8 @@ export const PostCard: React.FC<PostCardProps> = ({ post: initialPost, currentUs
                                 onChange={(e) => setNewComment(e.target.value)}
                                 onKeyDown={(e) => e.key === 'Enter' && handleCreateComment()}
                                 placeholder="Write a comment..."
-                                className={`w-full rounded-xl py-2 px-4 text-xs focus:outline-none focus:ring-1 focus:ring-apple-blue ${
-                                    isDark ? 'bg-white/5 border border-white/10 text-white' : 'bg-gray-100 border border-gray-200 text-gray-900'
-                                }`}
+                                className={`w-full rounded-xl py-2 px-4 text-xs focus:outline-none focus:ring-1 focus:ring-apple-blue ${isDark ? 'bg-white/5 border border-white/10 text-white' : 'bg-gray-100 border border-gray-200 text-gray-900'
+                                    }`}
                             />
                             <button
                                 onClick={handleCreateComment}
