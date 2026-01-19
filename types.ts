@@ -99,10 +99,11 @@ export interface ProjectTask {
   projectId: string;
   title: string;
   description: string;
-  assignedTo?: string;
+  assignedTo?: string; // Legacy single user ID
   assigned_to?: string; // Backend compatibility
-  assignedName?: string;
-  assignedAvatar?: string;
+  assignedName?: string; // Legacy
+  assignedAvatar?: string; // Legacy
+  assignees?: { id: string; name: string; avatar: string }[]; // New: support for multiple assignees
   status: 'Todo' | 'Done';
   dueDate?: string;
   createdAt?: string;

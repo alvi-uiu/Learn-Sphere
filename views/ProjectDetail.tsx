@@ -4,7 +4,7 @@ import { GlassCard } from '../components/GlassCard';
 import {
     ChevronLeft, Users, CheckSquare, Activity, Plus,
     Calendar, Clock, MessageSquare, Shield, Rocket,
-    CheckCircle2, Circle, AlertCircle, Trash2
+    CheckCircle2, Circle, AlertCircle, Trash2, X, Edit2
 } from 'lucide-react';
 import { Project, ProjectTask, ProjectMember, ProjectUpdate, User } from '../types';
 
@@ -19,9 +19,14 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ projectId, onBack,
     const [activeTab, setActiveTab] = useState<'tasks' | 'team' | 'applications'>('tasks');
     const [isLoading, setIsLoading] = useState(true);
 
-    // Task creation state
+    // Task creation/edit state
     const [showTaskForm, setShowTaskForm] = useState(false);
-    const [newTask, setNewTask] = useState({ title: '', description: '' });
+    const [taskToEdit, setTaskToEdit] = useState<ProjectTask | null>(null);
+    const [newTask, setNewTask] = useState<{ title: string; description: string; assignees: { id: string; name: string; avatar: string }[] }>({
+        title: '',
+        description: '',
+        assignees: []
+    });
 
     // Project edit state
     const [isEditing, setIsEditing] = useState(false);
@@ -108,21 +113,53 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ projectId, onBack,
     const handleAddTask = async () => {
         if (!newTask.title.trim()) return;
         try {
-            await fetch(`http://localhost:3001/api/projects/${projectId}/tasks`, {
-                method: 'POST',
+            const url = taskToEdit
+                ? `http://localhost:3001/api/projects/${projectId}/tasks/${taskToEdit.id}`
+                : `http://localhost:3001/api/projects/${projectId}/tasks`;
+            const method = taskToEdit ? 'PUT' : 'POST';
+
+            await fetch(url, {
+                method,
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    ...newTask,
-                    assignedTo: currentUser?.id,
-                    assignedName: currentUser?.name,
-                    assignedAvatar: currentUser?.avatar
+                    title: newTask.title,
+                    description: newTask.description,
+                    assignees: newTask.assignees,
+                    dueDate: taskToEdit?.dueDate
                 })
             });
+
             setShowTaskForm(false);
-            setNewTask({ title: '', description: '' });
+            setTaskToEdit(null);
+            setNewTask({ title: '', description: '', assignees: [] });
             fetchProjectDetails();
         } catch (e) {
-            console.error('Error adding task:', e);
+            console.error('Error saving task:', e);
+        }
+    };
+
+    const handleEditTask = (task: ProjectTask) => {
+        setTaskToEdit(task);
+        setNewTask({
+            title: task.title,
+            description: task.description,
+            assignees: task.assignees || []
+        });
+        setShowTaskForm(true);
+    };
+
+    const toggleAssignee = (member: ProjectMember) => {
+        const isAssigned = newTask.assignees.some(a => a.id === member.userId);
+        if (isAssigned) {
+            setNewTask({
+                ...newTask,
+                assignees: newTask.assignees.filter(a => a.id !== member.userId)
+            });
+        } else {
+            setNewTask({
+                ...newTask,
+                assignees: [...newTask.assignees, { id: member.userId, name: member.userName, avatar: member.userAvatar }]
+            });
         }
     };
 
@@ -483,21 +520,62 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ projectId, onBack,
                         {showTaskForm && (
                             <GlassCard className="mb-6 p-4 border-apple-blue/20 bg-apple-blue/5">
                                 <div className="space-y-4">
+                                    <div className="flex justify-between items-center mb-2">
+                                        <h4 className="text-sm font-bold">{taskToEdit ? 'Edit Task' : 'New Task'}</h4>
+                                        <button onClick={() => { setShowTaskForm(false); setTaskToEdit(null); }} className="text-gray-500 hover:text-white transition-colors">
+                                            <X size={16} />
+                                        </button>
+                                    </div>
                                     <input
-                                        className="w-full bg-white/5 border border-white/10 rounded-lg py-2 px-3 text-sm"
+                                        className="w-full bg-white/5 border border-white/10 rounded-lg py-2 px-3 text-sm focus:ring-1 focus:ring-apple-blue outline-none"
                                         placeholder="Task title..."
                                         value={newTask.title}
                                         onChange={e => setNewTask({ ...newTask, title: e.target.value })}
                                     />
-                                    <input
-                                        className="w-full bg-white/5 border border-white/10 rounded-lg py-2 px-3 text-sm"
+                                    <textarea
+                                        className="w-full bg-white/5 border border-white/10 rounded-lg py-2 px-3 text-sm focus:ring-1 focus:ring-apple-blue outline-none resize-none"
                                         placeholder="Brief description..."
+                                        rows={2}
                                         value={newTask.description}
                                         onChange={e => setNewTask({ ...newTask, description: e.target.value })}
                                     />
-                                    <div className="flex justify-end gap-2">
-                                        <button onClick={() => setShowTaskForm(false)} className="px-3 py-1.5 text-xs text-gray-500 font-bold">Cancel</button>
-                                        <button onClick={handleAddTask} className="px-4 py-1.5 bg-apple-blue text-white rounded-lg text-xs font-bold">Add Task</button>
+
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Assign Members</label>
+                                        <div className="flex flex-wrap gap-2">
+                                            {project.members && project.members.map((member: ProjectMember) => {
+                                                const isSelected = newTask.assignees.some(a => a.id === member.userId);
+                                                return (
+                                                    <button
+                                                        key={member.userId}
+                                                        onClick={() => toggleAssignee(member)}
+                                                        className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-[10px] font-bold border transition-all ${isSelected
+                                                            ? 'bg-apple-blue/20 border-apple-blue text-apple-blue'
+                                                            : 'bg-white/5 border-white/10 text-gray-500 hover:bg-white/10'
+                                                            }`}
+                                                    >
+                                                        <img src={member.userAvatar} className="w-4 h-4 rounded-full" />
+                                                        {member.userName}
+                                                        {isSelected && <CheckCircle2 size={12} />}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+
+                                    <div className="flex justify-end gap-2 pt-2">
+                                        <button
+                                            onClick={() => { setShowTaskForm(false); setTaskToEdit(null); }}
+                                            className="px-4 py-2 text-xs text-gray-400 font-bold hover:text-white transition-colors"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            onClick={handleAddTask}
+                                            className="px-6 py-2 bg-apple-blue text-white rounded-xl text-xs font-bold hover:scale-[1.02] active:scale-95 transition-all shadow-lg shadow-apple-blue/20"
+                                        >
+                                            {taskToEdit ? 'Save Changes' : 'Create Task'}
+                                        </button>
                                     </div>
                                 </div>
                             </GlassCard>
@@ -515,33 +593,59 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ projectId, onBack,
                                     key={task.id}
                                     className={`p-4 flex items-center justify-between group transition-all ${task.status === 'Done' ? 'opacity-50' : ''}`}
                                 >
-                                    <div className="flex items-center gap-4">
+                                    <div className="flex items-center gap-4 flex-1">
                                         <button
                                             onClick={() => toggleTaskStatus(task.id, task.status)}
-                                            className={`transition-colors ${task.status === 'Done' ? 'text-green-500' : 'text-gray-600 hover:text-gray-400'}`}
+                                            className={`transition-colors shrink-0 ${task.status === 'Done' ? 'text-green-500' : 'text-gray-600 hover:text-gray-400'}`}
                                         >
                                             {task.status === 'Done' ? <CheckCircle2 size={24} /> : <Circle size={24} />}
                                         </button>
-                                        <div>
-                                            <h4 className={`font-bold text-sm ${task.status === 'Done' ? 'line-through' : ''}`}>{task.title}</h4>
-                                            <p className="text-[10px] text-gray-500 mt-0.5">{task.description}</p>
+                                        <div className="min-w-0 flex-1">
+                                            <h4 className={`font-bold text-sm truncate ${task.status === 'Done' ? 'line-through text-gray-500' : ''}`}>{task.title}</h4>
+                                            <p className="text-[10px] text-gray-500 mt-0.5 line-clamp-1">{task.description}</p>
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-4">
-                                        {task.assignedAvatar && (
+                                    <div className="flex items-center gap-6 shrink-0 ml-4">
+                                        {task.assignees && task.assignees.length > 0 && (
                                             <div className="flex items-center gap-2">
-                                                <span className="text-[10px] text-gray-500 font-medium">Assigned to</span>
-                                                <img src={task.assignedAvatar} className="w-6 h-6 rounded-full" />
+                                                <div className="flex -space-x-2">
+                                                    {task.assignees.slice(0, 3).map((a, i) => (
+                                                        <img
+                                                            key={i}
+                                                            src={a.avatar}
+                                                            title={a.name}
+                                                            className="w-7 h-7 rounded-full border-2 border-[#121212] bg-apple-blue/10"
+                                                            alt={a.name}
+                                                        />
+                                                    ))}
+                                                    {task.assignees.length > 3 && (
+                                                        <div className="w-7 h-7 rounded-full border-2 border-[#121212] bg-apple-blue/20 flex items-center justify-center text-[8px] font-bold text-apple-blue">
+                                                            +{task.assignees.length - 3}
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </div>
                                         )}
-                                        {(currentUser?.id === project.owner_id || currentUser?.id === task.assigned_to) && (
-                                            <button
-                                                onClick={() => handleDeleteTask(task.id)}
-                                                className="opacity-0 group-hover:opacity-100 p-2 text-gray-600 hover:text-red-400 transition-all"
-                                            >
-                                                <Trash2 size={16} />
-                                            </button>
-                                        )}
+                                        <div className="flex items-center gap-1">
+                                            {(currentUser?.id === project.owner_id || task.assignees?.some(a => a.id === currentUser?.id)) && (
+                                                <>
+                                                    <button
+                                                        onClick={() => handleEditTask(task)}
+                                                        className="opacity-0 group-hover:opacity-100 p-2 text-gray-600 hover:text-apple-blue transition-all"
+                                                        title="Edit task"
+                                                    >
+                                                        <Edit2 size={16} />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleDeleteTask(task.id)}
+                                                        className="opacity-0 group-hover:opacity-100 p-2 text-gray-600 hover:text-red-400 transition-all"
+                                                        title="Delete task"
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                </>
+                                            )}
+                                        </div>
                                     </div>
                                 </GlassCard>
                             ))}

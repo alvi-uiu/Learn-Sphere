@@ -885,13 +885,18 @@ app.get('/api/projects/:id', async (req, res) => {
             role: m.role === 'Lead' ? 'Leader' : m.role
         }));
 
+        const mappedTasks = tasks.map(t => ({
+            ...t,
+            assignees: t.assignees ? JSON.parse(t.assignees) : (t.assigned_to ? [{ id: t.assigned_to, name: t.assigned_name, avatar: t.assigned_avatar }] : [])
+        }));
+
         res.json({
             ...project,
             ownerName: project.current_owner_name || project.owner_name,
             tags: project.tags ? JSON.parse(project.tags) : [],
             lookingFor: project.looking_for ? JSON.parse(project.looking_for) : [],
             members: mappedMembers,
-            tasks,
+            tasks: mappedTasks,
             updates,
             percentage
         });
@@ -1028,12 +1033,22 @@ app.put('/api/projects/:id/applications/:appId', async (req, res) => {
 app.post('/api/projects/:id/tasks', async (req, res) => {
     const db = getDb();
     const { id: projectId } = req.params;
-    const { title, description, assignedTo, assignedName, assignedAvatar, dueDate } = req.body;
+    const { title, description, assignedTo, assignedName, assignedAvatar, dueDate, assignees } = req.body;
     const id = uuidv4();
     try {
         await db.run(
-            `INSERT INTO project_tasks (id, project_id, title, description, assigned_to, assigned_name, assigned_avatar, due_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-            [id, projectId, title, description, assignedTo, assignedName, assignedAvatar, dueDate]
+            `INSERT INTO project_tasks (id, project_id, title, description, assigned_to, assigned_name, assigned_avatar, due_date, assignees) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+                id,
+                projectId,
+                title,
+                description,
+                assignedTo || null,
+                assignedName || null,
+                assignedAvatar || null,
+                dueDate || null,
+                assignees ? JSON.stringify(assignees) : null
+            ]
         );
         res.json({ success: true, id });
     } catch (e) {
@@ -1044,9 +1059,21 @@ app.post('/api/projects/:id/tasks', async (req, res) => {
 app.put('/api/projects/:projectId/tasks/:taskId', async (req, res) => {
     const db = getDb();
     const { taskId } = req.params;
-    const { status } = req.body;
+    const { status, title, description, assignees, dueDate } = req.body;
     try {
-        await db.run('UPDATE project_tasks SET status = ? WHERE id = ?', [status, taskId]);
+        const sets = [];
+        const params = [];
+
+        if (status !== undefined) { sets.push('status = ?'); params.push(status); }
+        if (title !== undefined) { sets.push('title = ?'); params.push(title); }
+        if (description !== undefined) { sets.push('description = ?'); params.push(description); }
+        if (assignees !== undefined) { sets.push('assignees = ?'); params.push(JSON.stringify(assignees)); }
+        if (dueDate !== undefined) { sets.push('due_date = ?'); params.push(dueDate); }
+
+        if (sets.length === 0) return res.json({ success: true, message: 'No changes' });
+
+        params.push(taskId);
+        await db.run(`UPDATE project_tasks SET ${sets.join(', ')} WHERE id = ?`, params);
         res.json({ success: true });
     } catch (e) {
         res.status(500).json({ error: (e as Error).message });

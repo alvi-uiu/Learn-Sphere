@@ -245,6 +245,11 @@ export const initDb = async () => {
         await db.exec(`ALTER TABLE users ADD COLUMN student_id TEXT`);
     } catch (e) { }
 
+    // Migration for project_tasks to support multiple assignees
+    try {
+        await db.exec(`ALTER TABLE project_tasks ADD COLUMN assignees TEXT`); // JSON array of objects
+    } catch (e) { }
+
     console.log('Tables created or verified.');
 
     // Seed Data Check
