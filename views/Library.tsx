@@ -217,6 +217,18 @@ const AIResultModal: React.FC<{
                 if (line.startsWith('# ')) return <h1 key={i} className={`text-2xl font-bold mt-6 mb-4 ${isDark ? 'text-white' : 'text-gray-900'}`}>{line.slice(2)}</h1>;
                 if (line.startsWith('## ')) return <h2 key={i} className={`text-xl font-bold mt-5 mb-3 ${isDark ? 'text-white' : 'text-gray-800'}`}>{line.slice(3)}</h2>;
                 if (line.startsWith('### ')) return <h3 key={i} className={`text-lg font-bold mt-4 mb-2 ${isDark ? 'text-white' : 'text-gray-800'}`}>{line.slice(4)}</h3>;
+
+                // Special styling for Answers in practice mode
+                if (line.startsWith('Answer:') || line.startsWith('Suggested Answer:')) return (
+                  <div key={i} className={`p-4 rounded-xl border mt-2 mb-4 animate-in slide-in-from-left duration-500 ${isDark ? 'bg-green-500/10 border-green-500/20 text-green-400' : 'bg-green-50 border-green-100 text-green-700'}`}>
+                    <div className="flex items-center gap-2 mb-1.5 opacity-80">
+                      <Sparkles size={14} className="animate-pulse" />
+                      <span className="text-[10px] font-black uppercase tracking-[0.2em]">{line.startsWith('Answer:') ? 'Correct Answer' : 'Suggested Solution'}</span>
+                    </div>
+                    <p className="text-sm font-semibold leading-relaxed">{line.replace(/^(Answer:|Suggested Answer:)\s*/, '')}</p>
+                  </div>
+                );
+
                 if (line.startsWith('- ') || line.startsWith('* ')) return (
                   <div key={i} className="flex gap-3 ml-2">
                     <span className="text-apple-blue mt-1.5">•</span>

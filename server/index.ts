@@ -637,12 +637,13 @@ app.post('/api/resources/:id/analyze', async (req, res) => {
                 YOUR TASK:
                 1. Create a "Study Prep" set based ONLY on the provided content.
                 2. Include 3 Multiple Choice Questions (MCQs) with 4 options each (mark them A, B, C, D).
-                3. Include 2 Short Answer Questions that require critical thinking about the text.
-                4. Provide a clearly labeled "ANSWER KEY" at the very end with brief explanations for why the MCQ answers are correct.
+                3. After EACH question, immediately provide the correct answer starting with "Answer:" and a brief explanation.
+                4. Include 2 Short Answer Questions that require critical thinking about the text, followed immediately by a "Suggested Answer:" section.
                 
                 FORMATTING RULES:
                 - Use clear Markdown headers.
                 - Keep the questions challenging but fair.
+                - Important: Place the answer and explanation immediately after EACH question, NOT at the end.
                 
                 CONTENT FOR QUESTIONS:
                 ---
