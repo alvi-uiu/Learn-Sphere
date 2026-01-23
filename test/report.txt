@@ -1,0 +1,171 @@
+=== Test Suite Started ===
+[2026-01-24 01:05:11] 
+Test Case 1: Login and Wait
+[2026-01-24 01:05:11] Action: Navigating to Base URL
+[2026-01-24 01:05:12] Action: Entering Email
+[2026-01-24 01:05:13] Action: Entering Password
+[2026-01-24 01:05:14] Action: Clicking Login Button
+[2026-01-24 01:05:14] Action: Waiting for Dashboard
+[2026-01-24 01:05:14] Action: Waiting for 1 second...
+[2026-01-24 01:05:15] Result: Login successful and wait finished!
+[2026-01-24 01:05:15] 
+Test Case 2: Create Multiple Users
+[2026-01-24 01:05:15] Action: Starting creation of 3 users
+[2026-01-24 01:05:17] Action: Attempting to create user1 (user1@gmail.com)
+[2026-01-24 01:05:21] Result: user1 created and logged in successfully.
+[2026-01-24 01:05:23] Action: Attempting to create user2 (user2@gmail.com)
+[2026-01-24 01:05:26] Result: user2 created and logged in successfully.
+[2026-01-24 01:05:28] Action: Attempting to create user3 (user3@gmail.com)
+[2026-01-24 01:05:31] Result: user3 created and logged in successfully.
+[2026-01-24 01:05:31] Result: Account creation attempts finished.
+[2026-01-24 01:05:31] 
+Test Case 3 & 4: Admin Login and Delete Users
+[2026-01-24 01:05:31] Action: Logging in as Admin
+[2026-01-24 01:05:34] Action: Waiting for Admin Dashboard
+[2026-01-24 01:05:34] Result: Admin Login Successful
+[2026-01-24 01:05:34] Action: Navigating to Users Tab
+[2026-01-24 01:05:37] Action: searching for user1 to delete
+[2026-01-24 01:05:39] Action: Accepting alert for user1: Are you sure you want to delete this user? This action cannot be undone.
+[2026-01-24 01:05:41] Result: user1 request sent successfully
+[2026-01-24 01:05:41] Action: searching for user2 to delete
+[2026-01-24 01:05:42] Action: Accepting alert for user2: Are you sure you want to delete this user? This action cannot be undone.
+[2026-01-24 01:05:44] Result: user2 request sent successfully
+[2026-01-24 01:05:44] Action: searching for user3 to delete
+[2026-01-24 01:05:45] Action: Accepting alert for user3: Are you sure you want to delete this user? This action cannot be undone.
+[2026-01-24 01:05:47] Result: user3 request sent successfully
+[2026-01-24 01:05:47] Action: Logging out
+[2026-01-24 01:05:47] Result: Logout clicked
+[2026-01-24 01:05:47] Result: Logout Successful
+[2026-01-24 01:05:47] 
+Test Case 5: User Create Post
+[2026-01-24 01:05:47] Action: Logging in as User
+[2026-01-24 01:05:49] Action: Entering User Credentials
+[2026-01-24 01:05:50] Action: Waiting for Dashboard
+[2026-01-24 01:05:50] Result: User Login Successful
+[2026-01-24 01:05:50] Action: Opening Create Post Modal
+[2026-01-24 01:05:51] Action: Entering Post Content
+[2026-01-24 01:05:52] Action: Submitting Post
+[2026-01-24 01:05:52] Action: Verifying Post on Feed
+[2026-01-24 01:05:54] Result: Post created successfully
+[2026-01-24 01:05:54] Action: Logging Logout
+[2026-01-24 01:05:54] Result: User Logout Successful
+[2026-01-24 01:05:54] 
+Test Case 6: Admin Delete Post
+[2026-01-24 01:05:54] Action: Logging in as Admin
+[2026-01-24 01:05:56] Action: Entering Admin Credentials
+[2026-01-24 01:05:57] Action: Waiting for Admin Dashboard
+[2026-01-24 01:05:57] Result: Admin Login Successful
+[2026-01-24 01:05:57] Action: Navigating to Posts Tab
+[2026-01-24 01:05:58] Action: Searching for post 'hey i am testing'
+[2026-01-24 01:05:59] Action: Locating Delete Button...
+[2026-01-24 01:06:00] Action: Clicking Delete Post
+[2026-01-24 01:06:00] Action: Handling Confirmation Alert
+[2026-01-24 01:06:02] Result: Post deleted successfully
+[2026-01-24 01:06:02] Result: Admin Logout Successful
+[2026-01-24 01:06:02] 
+Test Case 7: AI Tutor Interaction
+[2026-01-24 01:06:02] Action: Logging in as User
+[2026-01-24 01:06:04] Action: Entering User Credentials
+[2026-01-24 01:06:04] Result: User Login Successful
+[2026-01-24 01:06:04] Action: Navigating to AI Tutor
+[2026-01-24 01:06:05] Action: Sending message: 'hey i am testing using selenium'
+[2026-01-24 01:06:07] Action: Waiting for response...
+[2026-01-24 01:06:09] Result: Message sent and response likely received
+[2026-01-24 01:06:09] Action: Refreshing Page (Expect redirect to Feed)
+[2026-01-24 01:06:11] Action: Navigating back to AI Tutor
+[2026-01-24 01:06:13] Action: Deleting Conversation
+[2026-01-24 01:06:13] Action: Finding chat items...
+[2026-01-24 01:06:13] Action: Found 1 chats. Deleting the first one.
+[2026-01-24 01:06:14] Action: Hovering over chat item
+[2026-01-24 01:06:15] Action: Clicking delete button
+[2026-01-24 01:06:15] Action: Confirming Deletion
+[2026-01-24 01:06:15] Result: Conversation deleted
+[2026-01-24 01:06:15] Action: Logging out
+[2026-01-24 01:06:15] Result: Logout clicked
+[2026-01-24 01:06:17] Result: Logout Successful
+[2026-01-24 01:06:17] 
+Test Case 8: Library Upload and Interact
+[2026-01-24 01:06:17] Action: Logging in as User
+[2026-01-24 01:06:19] Action: Entering User Credentials
+[2026-01-24 01:06:20] Result: User Login Successful
+[2026-01-24 01:06:20] Action: Navigating to Library
+[2026-01-24 01:06:21] Action: Opening Upload Modal
+[2026-01-24 01:06:22] Action: Filling Upload Form
+[2026-01-24 01:06:22] Action: Submitting Upload
+[2026-01-24 01:06:23] Action: Waiting for upload/reload
+[2026-01-24 01:06:26] Action: Ensuring on Library page
+[2026-01-24 01:06:26] Action: Searching for 'test'
+[2026-01-24 01:06:27] Action: Clicking Explain
+[2026-01-24 01:06:27] Action: Waiting for Explanation response
+[2026-01-24 01:06:36] Result: Explanation received
+[2026-01-24 01:06:37] Action: Closing Explanation
+[2026-01-24 01:06:38] Action: Clicking Practice
+[2026-01-24 01:06:38] Action: Waiting for Practice Questions response
+[2026-01-24 01:06:49] Result: Practice Questions received
+[2026-01-24 01:06:50] Action: Closing Practice
+[2026-01-24 01:06:51] Result: Interaction Successful
+[2026-01-24 01:06:51] 
+Test Case 9: Admin Delete Resource 'test'
+[2026-01-24 01:06:51] Action: Logging in as Admin
+[2026-01-24 01:06:53] Action: Entering Admin Credentials
+[2026-01-24 01:06:53] Action: Waiting for Admin Dashboard
+[2026-01-24 01:06:53] Result: Admin Login Successful
+[2026-01-24 01:06:53] Action: Navigating to Resources Tab
+[2026-01-24 01:06:55] Result: Navigated to Resources Tab
+[2026-01-24 01:06:58] Action: Searching for 'test' file
+[2026-01-24 01:06:58] Info: Found search input
+[2026-01-24 01:07:01] Result: Search completed for 'test'
+[2026-01-24 01:07:01] Action: Attempting to locate and delete 'test' file
+[2026-01-24 01:07:01] Info: Found resource card with title containing 'test'
+[2026-01-24 01:07:02] Action: Hovering over resource card to reveal delete button
+[2026-01-24 01:07:05] Action: Locating delete button
+[2026-01-24 01:07:05] Info: Found delete button with red background class
+[2026-01-24 01:07:05] Action: Clicking Delete button
+[2026-01-24 01:07:05] Action: Handling confirmation alert
+[2026-01-24 01:07:06] Action: Alert text: 'Are you sure you want to delete this resource?'
+[2026-01-24 01:07:06] Action: Alert accepted
+[2026-01-24 01:07:08] Result: 'test' file deleted successfully
+[2026-01-24 01:07:08] Action: Logging out
+[2026-01-24 01:07:08] Result: Logout Successful
+[2026-01-24 01:07:08] 
+Test Case 10: User Create Project
+[2026-01-24 01:07:08] Action: Logging in as User
+[2026-01-24 01:07:10] Action: Entering User Credentials
+[2026-01-24 01:07:11] Action: Waiting for Dashboard
+[2026-01-24 01:07:11] Result: User Login Successful
+[2026-01-24 01:07:11] Action: Navigating to Projects/Collaboration Hub
+[2026-01-24 01:07:12] Result: Navigated to Projects
+[2026-01-24 01:07:15] Action: Clicking 'New Project' button
+[2026-01-24 01:07:16] Result: New Project modal opened
+[2026-01-24 01:07:16] Action: Filling project form
+[2026-01-24 01:07:16] Info: Entered title 'test'
+[2026-01-24 01:07:16] Info: Entered description
+[2026-01-24 01:07:16] Info: Entered student ID '12345678'
+[2026-01-24 01:07:17] Action: Clicking 'Create Project' button
+[2026-01-24 01:07:18] Result: Create Project button clicked
+[2026-01-24 01:07:21] Result: Project created successfully
+[2026-01-24 01:07:21] Action: Logging out
+[2026-01-24 01:07:21] Result: Logout Successful
+[2026-01-24 01:07:21] 
+Test Case 11: Admin Delete Project
+[2026-01-24 01:07:21] Action: Logging in as Admin
+[2026-01-24 01:07:23] Action: Entering Admin Credentials
+[2026-01-24 01:07:23] Action: Waiting for Admin Dashboard
+[2026-01-24 01:07:23] Result: Admin Login Successful
+[2026-01-24 01:07:23] Action: Navigating to Projects Tab
+[2026-01-24 01:07:25] Result: Navigated to Projects Tab
+[2026-01-24 01:07:28] Action: Searching for 'test' project
+[2026-01-24 01:07:28] Info: Found search input
+[2026-01-24 01:07:31] Result: Search completed for 'test'
+[2026-01-24 01:07:31] Action: Attempting to locate and delete 'test' project
+[2026-01-24 01:07:31] Info: Found project row with title 'test'
+[2026-01-24 01:07:32] Action: Locating delete button
+[2026-01-24 01:07:32] Info: Found delete button
+[2026-01-24 01:07:32] Action: Clicking Delete button
+[2026-01-24 01:07:33] Action: Handling confirmation alert
+[2026-01-24 01:07:34] Action: Alert text: 'Are you sure you want to delete this project?'
+[2026-01-24 01:07:34] Action: Alert accepted
+[2026-01-24 01:07:36] Result: 'test' project deleted successfully
+[2026-01-24 01:07:36] Action: Logging out
+[2026-01-24 01:07:36] Result: Logout Successful
+[2026-01-24 01:07:38] === Test Suite Finished ===

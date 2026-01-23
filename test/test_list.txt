@@ -1,0 +1,43 @@
+=== Learn-Sphere Test Suite ===
+
+Test Case 1: Login and Wait
+Method: test_login_and_wait
+Description: User logs in with credentials and waits for dashboard to load
+
+Test Case 2: Create Multiple Users
+Method: test_create_multiple_users
+Description: Creates 3 new user accounts (user1, user2, user3) with random passwords
+
+Test Case 3 & 4: Admin Login and Delete Users
+Method: test_admin_login_and_delete_users
+Description: Admin logs in, navigates to Users tab, and deletes user1, user2, user3
+
+Test Case 5: User Create Post
+Method: test_user_create_post
+Description: User logs in, creates a post with text "hey i am testing", and logs out
+
+Test Case 6: Admin Delete Post
+Method: test_admin_delete_post
+Description: Admin logs in, searches for the test post, and deletes it
+
+Test Case 7: AI Tutor Interaction
+Method: test_ai_tutor_interaction
+Description: User sends message to AI Tutor, refreshes page, returns to Tutor, and deletes conversation
+
+Test Case 8: Library Upload and Interact
+Method: test_library_upload_and_interact
+Description: User uploads PDF to library, searches for it, and uses Explain/Practice features
+
+Test Case 9: Admin Delete Resource
+Method: test_admin_delete_resource
+Description: Admin logs in, searches for 'test' resource in library, and deletes it
+
+Test Case 10: User Create Project
+Method: test_user_create_project
+Description: User creates new project with title 'test' in Collaboration Hub
+
+Test Case 11: Admin Delete Project
+Method: test_admin_delete_project
+Description: Admin logs in, searches for 'test' project, and deletes it
+
+=== End of Test List ===
