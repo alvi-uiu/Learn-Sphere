@@ -390,11 +390,16 @@ export const AdminView: React.FC = () => {
                       </div>
                     </GlassCard>
                   </div>
+                </div>
+
+                {/* Project History Column */}
+                <div className="space-y-6">
+                  <h3 className="text-lg font-bold flex items-center gap-2">
+                    <Zap size={20} className="text-yellow-400" />
+                    Project History
+                  </h3>
 
                   <GlassCard className="p-6">
-                    <h4 className="text-xs font-bold uppercase text-gray-500 mb-4 tracking-widest flex items-center gap-2">
-                      <Zap size={14} /> Recent Projects
-                    </h4>
                     <div className="space-y-4">
                       {stats.recent.projects.map((pr, i) => (
                         <div key={i} className="flex items-center gap-4 p-3 rounded-xl bg-white/[0.02] border border-white/5 hover:border-white/10 transition-colors">
@@ -411,45 +416,6 @@ export const AdminView: React.FC = () => {
                           </div>
                         </div>
                       ))}
-                    </div>
-                  </GlassCard>
-                </div>
-
-                {/* System Status Column */}
-                <div className="space-y-6">
-                  <h3 className="text-lg font-bold flex items-center gap-2">
-                    <Database size={20} className="text-purple-400" />
-                    Infrastructure
-                  </h3>
-
-                  <GlassCard className="p-6 space-y-6">
-                    <div className="space-y-1">
-                      <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Backend Uptime</p>
-                      <p className="text-sm font-bold">{(stats.system.uptime / 3600).toFixed(2)} hours</p>
-                      <div className="w-full h-1 bg-white/5 rounded-full mt-2 overflow-hidden">
-                        <div className="h-full bg-green-500 w-[99%]"></div>
-                      </div>
-                    </div>
-
-                    <div className="space-y-1">
-                      <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Gemini AI API</p>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <div className={`w-2 h-2 rounded-full ${stats.system.gemini === 'Active' ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></div>
-                          <p className="text-sm font-bold">{stats.system.gemini}</p>
-                        </div>
-                        <span className="text-[10px] bg-green-500/10 text-green-500 px-1.5 py-0.5 rounded font-bold uppercase">Healthy</span>
-                      </div>
-                    </div>
-
-                    <div className="space-y-1 pt-4 border-t border-white/5">
-                      <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Node Version</p>
-                      <p className="text-sm font-bold">{stats.system.nodeVersion}</p>
-                    </div>
-
-                    <div className="space-y-1">
-                      <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Host Platform</p>
-                      <p className="text-sm font-bold uppercase">{stats.system.platform}</p>
                     </div>
                   </GlassCard>
                 </div>

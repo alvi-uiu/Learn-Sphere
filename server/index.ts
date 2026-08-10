@@ -618,9 +618,9 @@ app.post('/api/resources/:id/analyze', async (req, res) => {
                 4. Use a friendly, encouraging tone.
                 
                 FORMATTING RULES:
-                - Use clear Markdown headers (##) for sections.
-                - Use **bold** for important definitions.
-                - Use bullet points for readability.
+                - Use plain text only. Do NOT use any Markdown characters (##, **, *, or backticks).
+                - Use ALL CAPS for section titles instead of headers.
+                - Use dashes (-) for bullet points.
                 - If there are equations or formulas, explain them in plain English.
                 
                 CONTENT TO EXPLAIN:
@@ -641,7 +641,7 @@ app.post('/api/resources/:id/analyze', async (req, res) => {
                 4. Include 2 Short Answer Questions that require critical thinking about the text, followed immediately by a "Suggested Answer:" section.
                 
                 FORMATTING RULES:
-                - Use clear Markdown headers.
+                - Use plain text only. Do NOT use any Markdown characters (##, **, *, or backticks).
                 - Keep the questions challenging but fair.
                 - Important: Place the answer and explanation immediately after EACH question, NOT at the end.
                 
@@ -655,7 +655,7 @@ app.post('/api/resources/:id/analyze', async (req, res) => {
         }
 
         const response = await genAI.models.generateContent({
-            model: "gemini-2.5-flash",
+            model: "gemini-3.6-flash",
             contents: [{ role: 'user', parts: [{ text: prompt }] }]
         });
 
@@ -766,7 +766,7 @@ app.post('/api/chat', async (req, res) => {
 
         // 4. Generate Response
         const response = await genAI.models.generateContent({
-            model: "gemini-2.5-flash",
+            model: "gemini-3.6-flash",
             contents: history,
             config: { systemInstruction: systemInstruction }
         });

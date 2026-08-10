@@ -197,7 +197,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeView, setActiveV
           </div>
         </header>
 
-        <div className="p-6 md:p-10 flex-1">
+        <div className={`p-6 md:p-10 flex-1 ${isDark ? 'bg-black' : 'bg-white'}`}>
           {children}
         </div>
       </main>

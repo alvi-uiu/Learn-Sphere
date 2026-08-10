@@ -261,6 +261,8 @@ const AIResultModal: React.FC<{
 };
 
 export const LibraryView: React.FC = () => {
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
   const [resources, setResources] = useState<Resource[]>([]);
   const [notes, setNotes] = useState<Note[]>([]); // Keep notes for compatibility if needed, but primary focus is resources now? User asked for filtering "notes" too in resource type
   // Wait, the requirement says "Resource types: Note, Slide, Question Bank". 
@@ -463,7 +465,7 @@ export const LibraryView: React.FC = () => {
                     </span>
                   </div>
 
-                  <h3 className="font-bold text-gray-200 mb-1 line-clamp-2 leading-tight group-hover:text-apple-blue transition-colors">
+                  <h3 className={`font-bold mb-1 line-clamp-2 leading-tight group-hover:text-apple-blue transition-colors ${isDark ? 'text-gray-200' : 'text-black'}`}>
                     {resource.title}
                   </h3>
                   <p className="text-xs text-gray-500 mb-4">{resource.subject} • {resource.trimester}</p>

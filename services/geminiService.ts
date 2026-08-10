@@ -7,7 +7,7 @@ export const geminiService = {
   async getTutorResponse(message: string, history: { role: 'user' | 'model', text: string }[]) {
     try {
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3.6-flash',
         contents: history.map(h => ({
           role: h.role === 'user' ? 'user' : 'model',
           parts: [{ text: h.text }]
@@ -27,7 +27,7 @@ export const geminiService = {
   async synthesizeNotes(notes: string[]) {
     try {
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3.6-flash',
         contents: `Synthesize the following course notes into a comprehensive, easy-to-understand study guide: \n\n${notes.join('\n---\n')}`,
         config: {
           systemInstruction: "You are an expert academic synthesizer. Create high-quality, structured study materials from raw notes.",
@@ -44,7 +44,7 @@ export const geminiService = {
   async getMotivationalSupport(performanceData: string) {
     try {
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3.6-flash',
         contents: `Analyze this student performance summary and provide personalized motivation and study strategies: ${performanceData}`,
         config: {
           systemInstruction: "You are a student success coach. Focus on resilience, consistency, and confidence.",

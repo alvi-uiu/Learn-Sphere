@@ -83,7 +83,7 @@ const FormattedMessage: React.FC<{ text: string; isDark: boolean }> = ({ text, i
           }
 
           // Default Paragraph
-          return <p key={`${i}-${j}`} className={`leading-relaxed ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>{renderInline(line, isDark)}</p>;
+          return <p key={`${i}-${j}`} className={`leading-relaxed ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>{renderInline(line, isDark)}</p>;
         });
       })}
     </div>
@@ -98,7 +98,7 @@ const renderInline = (text: string, isDark: boolean) => {
       return <strong key={k} className={`font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>{part.slice(2, -2)}</strong>;
     }
     if (part.startsWith('`') && part.endsWith('`')) {
-      return <code key={k} className={`px-1.5 py-0.5 rounded font-mono text-[11px] ${isDark ? 'bg-white/10 text-apple-blue border border-white/5' : 'bg-blue-100 text-blue-700 border border-blue-200'}`}>{part.slice(1, -1)}</code>;
+      return <code key={k} className={`px-1.5 py-0.5 rounded font-mono text-[11px] ${isDark ? 'bg-white/10 text-apple-blue border border-white/5' : 'bg-gray-100 text-blue-700 border border-blue-200'}`}>{part.slice(1, -1)}</code>;
     }
     return part;
   });
@@ -413,10 +413,10 @@ export const TutorView: React.FC = () => {
                 <div className={`flex gap-4 max-w-[95%] md:max-w-[85%] ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
                   {/* Avatar */}
                   <div className={`w-8 h-8 rounded-xl flex-shrink-0 flex items-center justify-center shadow-lg ${msg.role === 'user'
-                    ? isDark ? 'bg-white/10 border border-white/10' : 'bg-gray-100 border border-gray-200'
+                    ? isDark ? 'bg-white/10 border border-white/10' : 'bg-apple-blue'
                     : 'apple-gradient'
                     }`}>
-                    {msg.role === 'user' ? <div className={`text-xs font-bold ${isDark ? 'text-white' : 'text-gray-700'}`}>AJ</div> : <Sparkles size={14} className="text-white" />}
+                    {msg.role === 'user' ? <div className={`text-xs font-bold ${isDark ? 'text-white' : 'text-white'}`}>AJ</div> : <Sparkles size={14} className="text-white" />}
                   </div>
 
                   {/* Bubble */}
@@ -424,7 +424,7 @@ export const TutorView: React.FC = () => {
                     ? 'bg-apple-blue text-white rounded-tr-none shadow-xl shadow-apple-blue/10'
                     : isDark
                       ? 'glass border-white/10 text-gray-200 rounded-tl-none'
-                      : 'bg-gray-100 border border-gray-200 text-gray-700 rounded-tl-none'
+                      : 'bg-white border border-gray-200 text-gray-900 rounded-tl-none'
                     }`}>
                     <FormattedMessage text={msg.text} isDark={isDark} />
                   </div>
@@ -503,7 +503,7 @@ export const TutorView: React.FC = () => {
               />
             </div>
             <p className={`text-[10px] text-center mt-4 font-medium uppercase tracking-[0.2em] opacity-50 ${isDark ? 'text-gray-600' : 'text-gray-500'}`}>
-              AI Partner • Powered by Gemini Flash 2.5
+              AI Partner • Powered by Gemini Flash 3.6
             </p>
           </div>
         </GlassCard>
